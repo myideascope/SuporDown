@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -16,26 +16,61 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ServiceDetailPanel from "./ServiceDetailPanel";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUserServices } from "@/lib/supabase";
 
 interface Service {
   id: string;
   name: string;
+  url: string;
   status: "healthy" | "degraded" | "down";
   lastChecked: string;
   uptime: number;
   responseTime: number;
-  url: string;
+  enabled: boolean;
 }
 
 interface StatusCardGridProps {
   services?: Service[];
 }
 
-const StatusCardGrid = ({
-  services = defaultServices,
-}: StatusCardGridProps) => {
+const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const loadServices = async () => {
+      if (user) {
+        setLoading(true);
+        const { data } = await getUserServices(user.id);
+        if (data) {
+          // Transform database services to display format
+          const transformedServices = data.map((service) => ({
+            id: service.id,
+            name: service.name,
+            url: service.url,
+            status: "healthy" as const, // In real app, this would be calculated
+            lastChecked: "2 mins ago", // In real app, this would be calculated
+            uptime: 99.9, // In real app, this would be calculated
+            responseTime: 120, // In real app, this would be calculated
+            enabled: service.enabled,
+          }));
+          setServices(transformedServices);
+        }
+        setLoading(false);
+      }
+    };
+
+    if (propServices) {
+      setServices(propServices);
+      setLoading(false);
+    } else {
+      loadServices();
+    }
+  }, [user, propServices]);
 
   const handleCardClick = (service: Service) => {
     setSelectedService(service);
@@ -71,6 +106,46 @@ const StatusCardGrid = ({
         return <Badge variant="outline">Unknown</Badge>;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-background w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-2">
+                <div className="h-6 bg-muted rounded w-3/4"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (services.length === 0) {
+    return (
+      <div className="bg-background w-full">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Services Yet</h3>
+              <p className="text-muted-foreground">
+                Add your first monitoring endpoint to get started.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background w-full">
@@ -129,63 +204,5 @@ const StatusCardGrid = ({
     </div>
   );
 };
-
-// Default mock data
-const defaultServices: Service[] = [
-  {
-    id: "1",
-    name: "API Server",
-    status: "healthy",
-    lastChecked: "2 mins ago",
-    uptime: 99.98,
-    responseTime: 42,
-    url: "https://api.example.com",
-  },
-  {
-    id: "2",
-    name: "Database Cluster",
-    status: "degraded",
-    lastChecked: "5 mins ago",
-    uptime: 98.5,
-    responseTime: 250,
-    url: "https://db.example.com",
-  },
-  {
-    id: "3",
-    name: "Authentication Service",
-    status: "healthy",
-    lastChecked: "1 min ago",
-    uptime: 99.99,
-    responseTime: 35,
-    url: "https://auth.example.com",
-  },
-  {
-    id: "4",
-    name: "Storage Server",
-    status: "down",
-    lastChecked: "10 mins ago",
-    uptime: 95.2,
-    responseTime: 0,
-    url: "https://storage.example.com",
-  },
-  {
-    id: "5",
-    name: "Web Frontend",
-    status: "healthy",
-    lastChecked: "3 mins ago",
-    uptime: 99.95,
-    responseTime: 65,
-    url: "https://www.example.com",
-  },
-  {
-    id: "6",
-    name: "Payment Gateway",
-    status: "healthy",
-    lastChecked: "4 mins ago",
-    uptime: 99.9,
-    responseTime: 120,
-    url: "https://payments.example.com",
-  },
-];
 
 export default StatusCardGrid;

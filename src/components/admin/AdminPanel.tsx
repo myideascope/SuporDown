@@ -31,9 +31,10 @@ import {
   updateAlertStatus,
   getAlertDispatchers,
   updateAlertDispatcherStatus,
+  updateUserSubscription,
 } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Users, Shield, Bell, Settings } from "lucide-react";
+import { Users, Shield, Bell, Settings, CreditCard } from "lucide-react";
 
 interface User {
   id: string;
@@ -60,6 +61,14 @@ interface AlertDispatcher {
   name: string;
   type: string;
   enabled: boolean;
+}
+
+interface UserSubscription {
+  stripe_customer_id: string | null;
+  subscription_status: string;
+  subscription_id: string | null;
+  endpoint_addons: number;
+  subscription_current_period_end: string | null;
 }
 
 const AdminPanel = () => {
@@ -216,6 +225,10 @@ const AdminPanel = () => {
             <Users className="mr-2 h-4 w-4" />
             Users & Groups
           </TabsTrigger>
+          <TabsTrigger value="subscriptions">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Subscriptions
+          </TabsTrigger>
           <TabsTrigger value="alerts">
             <Bell className="mr-2 h-4 w-4" />
             Alert Management
@@ -321,6 +334,44 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="subscriptions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Subscriptions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {users.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-3 border rounded"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {user.full_name || user.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Free Plan</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        1 endpoint
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {users.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">
+                    No users found.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="alerts" className="space-y-4">

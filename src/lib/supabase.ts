@@ -145,3 +145,69 @@ export const updateAlertDispatcherStatus = async (
     .eq("id", dispatcherId);
   return { data, error };
 };
+
+// Subscription management
+export const getUserSubscription = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("users")
+    .select(
+      "stripe_customer_id, subscription_status, subscription_id, endpoint_addons, subscription_current_period_end",
+    )
+    .eq("id", userId)
+    .single();
+  return { data, error };
+};
+
+export const updateUserSubscription = async (
+  userId: string,
+  subscriptionData: {
+    stripe_customer_id?: string;
+    subscription_status?: string;
+    subscription_id?: string;
+    endpoint_addons?: number;
+    subscription_current_period_end?: string;
+  },
+) => {
+  const { data, error } = await supabase
+    .from("users")
+    .update(subscriptionData)
+    .eq("id", userId);
+  return { data, error };
+};
+
+// Service management
+export const getUserServices = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("services")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  return { data, error };
+};
+
+export const createService = async (serviceData: {
+  user_id: string;
+  name: string;
+  url: string;
+  type: string;
+  check_frequency: number;
+  timeout: number;
+  retry_count: number;
+  success_codes: string;
+  notify_on_failure: boolean;
+}) => {
+  const { data, error } = await supabase
+    .from("services")
+    .insert(serviceData)
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const getServiceCount = async (userId: string) => {
+  const { count, error } = await supabase
+    .from("services")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  return { count, error };
+};

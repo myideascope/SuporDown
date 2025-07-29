@@ -8,6 +8,15 @@ import AdminPanel from "./components/admin/AdminPanel";
 import { useAuth } from "./contexts/AuthContext";
 import routes from "tempo-routes";
 
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+      <Toaster />
+    </AuthProvider>
+  );
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
 
@@ -33,15 +42,6 @@ function AppContent() {
         {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
       </>
     </Suspense>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-      <Toaster />
-    </AuthProvider>
   );
 }
 

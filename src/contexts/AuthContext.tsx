@@ -1,11 +1,24 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase, getUserPermissions } from "@/lib/supabase";
+import {
+  supabase,
+  getUserPermissions,
+  getUserSubscription,
+} from "@/lib/supabase";
+
+interface SubscriptionInfo {
+  stripe_customer_id: string | null;
+  subscription_status: string;
+  subscription_id: string | null;
+  endpoint_addons: number;
+  subscription_current_period_end: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   permissions: string[];
+  subscription: SubscriptionInfo | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (
@@ -16,6 +29,9 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
   refreshPermissions: () => Promise<void>;
+  refreshSubscription: () => Promise<void>;
+  getEndpointLimit: () => number;
+  canAddEndpoint: (currentCount: number) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,6 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
 
   const refreshPermissions = async () => {
@@ -42,6 +61,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setPermissions(userPermissions);
     } else {
       setPermissions([]);
+    }
+  };
+
+  const refreshSubscription = async () => {
+    if (user) {
+      const { data } = await getUserSubscription(user.id);
+      setSubscription(data);
+    } else {
+      setSubscription(null);
     }
   };
 
@@ -67,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     refreshPermissions();
+    refreshSubscription();
   }, [user]);
 
   const signIn = async (email: string, password: string) => {
@@ -98,16 +127,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return permissions.includes("admin") || permissions.includes(permission);
   };
 
+  const getEndpointLimit = () => {
+    if (!subscription) return 1; // Default free tier
+    if (subscription.subscription_status === "active") {
+      return 1 + subscription.endpoint_addons * 5; // 1 free + 5 per addon
+    }
+    return 1; // Free tier
+  };
+
+  const canAddEndpoint = (currentCount: number) => {
+    return currentCount < getEndpointLimit();
+  };
+
   const value = {
     user,
     session,
     permissions,
+    subscription,
     loading,
     signIn,
     signUp,
     signOut,
     hasPermission,
     refreshPermissions,
+    refreshSubscription,
+    getEndpointLimit,
+    canAddEndpoint,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

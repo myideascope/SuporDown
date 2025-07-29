@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Bell,
   Settings,
@@ -7,6 +7,7 @@ import {
   Search,
   LogOut,
   Shield,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
@@ -17,12 +18,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import StatusCardGrid from "./dashboard/StatusCardGrid";
 import IncidentTimeline from "./dashboard/IncidentTimeline";
 import QuickAddWidget from "./dashboard/QuickAddWidget";
+import SubscriptionManager from "./subscription/SubscriptionManager";
+import { getServiceCount } from "@/lib/supabase";
 
 const Home = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [subscriptionStatus, setSubscriptionStatus] = useState("Pro");
-  const { user, signOut, hasPermission } = useAuth();
+  const [serviceCount, setServiceCount] = useState(0);
+  const { user, signOut, hasPermission, subscription, getEndpointLimit } =
+    useAuth();
+
+  useEffect(() => {
+    const loadServiceCount = async () => {
+      if (user) {
+        const { count } = await getServiceCount(user.id);
+        setServiceCount(count || 0);
+      }
+    };
+    loadServiceCount();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,7 +46,18 @@ const Home = () => {
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold">SuporDown</h1>
-            <Badge variant="secondary">{subscriptionStatus}</Badge>
+            <Badge
+              variant={
+                subscription?.subscription_status === "active"
+                  ? "default"
+                  : "secondary"
+              }
+            >
+              {subscription?.subscription_status === "active" ? "Pro" : "Free"}
+            </Badge>
+            <div className="text-sm text-muted-foreground">
+              {serviceCount}/{getEndpointLimit()} endpoints
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -47,6 +73,13 @@ const Home = () => {
             </Button>
             <Button variant="outline" size="icon">
               <Settings className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowSubscription(true)}
+            >
+              <CreditCard className="h-5 w-5" />
             </Button>
             {hasPermission("admin") && (
               <Button
@@ -101,9 +134,9 @@ const Home = () => {
                   <div className="h-4 w-4 rounded-full bg-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">12</div>
+                  <div className="text-2xl font-bold">{serviceCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    4 added this month
+                    {getEndpointLimit() - serviceCount} remaining
                   </p>
                 </CardContent>
               </Card>
@@ -222,7 +255,29 @@ const Home = () => {
 
       {/* Quick Add Widget Modal */}
       {showQuickAdd && (
-        <QuickAddWidget onClose={() => setShowQuickAdd(false)} />
+        <QuickAddWidget
+          onClose={() => setShowQuickAdd(false)}
+          onOpenChange={setShowQuickAdd}
+        />
+      )}
+
+      {/* Subscription Manager Modal */}
+      {showSubscription && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Subscription Management</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSubscription(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <SubscriptionManager onClose={() => setShowSubscription(false)} />
+          </div>
+        </div>
       )}
     </div>
   );

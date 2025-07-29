@@ -155,6 +155,62 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          check_frequency: number | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          name: string
+          notify_on_failure: boolean | null
+          retry_count: number | null
+          success_codes: string | null
+          timeout: number | null
+          type: string
+          updated_at: string | null
+          url: string
+          user_id: string | null
+        }
+        Insert: {
+          check_frequency?: number | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          name: string
+          notify_on_failure?: boolean | null
+          retry_count?: number | null
+          success_codes?: string | null
+          timeout?: number | null
+          type?: string
+          updated_at?: string | null
+          url: string
+          user_id?: string | null
+        }
+        Update: {
+          check_frequency?: number | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          name?: string
+          notify_on_failure?: boolean | null
+          retry_count?: number | null
+          success_codes?: string | null
+          timeout?: number | null
+          type?: string
+          updated_at?: string | null
+          url?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_groups: {
         Row: {
           created_at: string | null
@@ -232,24 +288,39 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           email: string
+          endpoint_addons: number | null
           full_name: string | null
           id: string
+          stripe_customer_id: string | null
+          subscription_current_period_end: string | null
+          subscription_id: string | null
+          subscription_status: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           email: string
+          endpoint_addons?: number | null
           full_name?: string | null
           id: string
+          stripe_customer_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_id?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           email?: string
+          endpoint_addons?: number | null
           full_name?: string | null
           id?: string
+          stripe_customer_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_id?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Relationships: []
