@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PlusIcon, XIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +66,10 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
     }));
   };
 
+  const { hasPermission } = useAuth();
+
   const handleSubmit = () => {
+    if (!hasPermission("edit_alerts")) return;
     onAddService(serviceConfig);
     onOpenChange(false);
     // Reset form
@@ -230,7 +234,10 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!isFormValid}>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isFormValid || !hasPermission("edit_alerts")}
+          >
             Add Service
           </Button>
         </DialogFooter>

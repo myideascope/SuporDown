@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { Bell, Settings, User, Plus, Search } from "lucide-react";
+import {
+  Bell,
+  Settings,
+  User,
+  Plus,
+  Search,
+  LogOut,
+  Shield,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
@@ -13,6 +22,7 @@ const Home = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [subscriptionStatus, setSubscriptionStatus] = useState("Pro");
+  const { user, signOut, hasPermission } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -20,7 +30,7 @@ const Home = () => {
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">Uptime Monitor</h1>
+            <h1 className="text-xl font-bold">SuporDown</h1>
             <Badge variant="secondary">{subscriptionStatus}</Badge>
           </div>
 
@@ -38,8 +48,17 @@ const Home = () => {
             <Button variant="outline" size="icon">
               <Settings className="h-5 w-5" />
             </Button>
-            <Button variant="outline" size="icon">
-              <User className="h-5 w-5" />
+            {hasPermission("admin") && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => (window.location.href = "/admin")}
+              >
+                <Shield className="h-5 w-5" />
+              </Button>
+            )}
+            <Button variant="outline" size="icon" onClick={signOut}>
+              <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -54,9 +73,11 @@ const Home = () => {
               Monitor your services and receive alerts when they go down.
             </p>
           </div>
-          <Button onClick={() => setShowQuickAdd(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Service
-          </Button>
+          {hasPermission("edit_alerts") && (
+            <Button onClick={() => setShowQuickAdd(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Service
+            </Button>
+          )}
         </div>
 
         <Tabs

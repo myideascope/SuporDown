@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
   CardHeader,
@@ -91,6 +92,7 @@ const ServiceDetailPanel = ({
   const [slackAlerts, setSlackAlerts] = useState(true);
   const [webhookAlerts, setWebhookAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
+  const { hasPermission } = useAuth();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -298,6 +300,7 @@ const ServiceDetailPanel = ({
                   <Switch
                     checked={emailAlerts}
                     onCheckedChange={setEmailAlerts}
+                    disabled={!hasPermission("manage_alert_dispatchers")}
                   />
                 </div>
                 <Separator />
@@ -398,7 +401,10 @@ const ServiceDetailPanel = ({
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="ml-auto">
+                <Button
+                  className="ml-auto"
+                  disabled={!hasPermission("edit_alerts")}
+                >
                   <Check className="mr-2 h-4 w-4" />
                   Save Alert Settings
                 </Button>
