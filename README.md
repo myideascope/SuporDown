@@ -1,9 +1,9 @@
-# Uptime Monitoring and Alerts
+# SuporDown Uptime Monitoring and Alerts
 
-[![Contributors](https://img.shields.io/github/contributors/yourusername/uptime-monitoring?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/graphs/contributors)
-[![Stargazers](https://img.shields.io/github/stars/yourusername/uptime-monitoring?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/stargazers)
-[![Forks](https://img.shields.io/github/forks/yourusername/uptime-monitoring?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/network/members)
-[![Issues](https://img.shields.io/github/issues/yourusername/uptime-monitoring?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/issues)
+[![Contributors](https://img.shields.io/github/contributors/myideascope/SuporDown?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/graphs/contributors)
+[![Stargazers](https://img.shields.io/github/stars/myideascope/SuporDown?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/stargazers)
+[![Forks](https://img.shields.io/github/forks/myideascope/SuporDown?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/network/members)
+[![Issues](https://img.shields.io/github/issues/myideascope/SuporDown?style=for-the-badge)](https://github.com/yourusername/uptime-monitoring/issues)
 
 A subscription-based monitoring platform that tracks the status of services and devices, sending real-time alerts through multiple channels when outages are detected.
 
@@ -101,7 +101,7 @@ Contributions are what make the open source community such an amazing place to l
 ## Top Contributors
 
 <a href="https://github.com/yourusername/uptime-monitoring/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yourusername/uptime-monitoring" />
+  <img src="https://contrib.rocks/image?repo=myideascope/SuporDown" />
 </a>
 
 ## Contact
