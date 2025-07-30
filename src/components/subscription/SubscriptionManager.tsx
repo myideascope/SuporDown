@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { CreditCard, Plus, Check } from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
-
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
-);
+import {
+  stripePromise,
+  createCheckoutSession,
+  createPortalSession,
+  createStripeCustomer,
+} from "@/lib/stripe";
 
 interface SubscriptionManagerProps {
   open?: boolean;
@@ -30,15 +31,38 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
     setLoading(true);
     try {
-      const stripe = await stripePromise;
-      if (!stripe) throw new Error("Stripe failed to load");
+      let customerId = subscription?.stripe_customer_id;
 
-      // In a real implementation, you would call your backend to create a checkout session
-      // For now, we'll simulate the upgrade
-      toast({
-        title: "Upgrade Simulation",
-        description: "In a real app, this would redirect to Stripe checkout",
-      });
+      // Create Stripe customer if doesn't exist
+      if (!customerId) {
+        const { data: customerData, error: customerError } =
+          await createStripeCustomer(user.id, user.email || "");
+
+        if (customerError || !customerData) {
+          throw new Error("Failed to create customer");
+        }
+
+        customerId = customerData.customerId;
+        await refreshSubscription();
+      }
+
+      // Create checkout session for Pro plan
+      const { data: sessionData, error: sessionError } =
+        await createCheckoutSession({
+          customerId,
+          priceId: "price_pro_monthly", // Replace with your actual price ID
+          successUrl: `${window.location.origin}/?success=true`,
+          cancelUrl: `${window.location.origin}/?canceled=true`,
+        });
+
+      if (sessionError || !sessionData) {
+        throw new Error("Failed to create checkout session");
+      }
+
+      // Redirect to Stripe Checkout
+      if (sessionData.url) {
+        window.location.href = sessionData.url;
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -51,16 +75,27 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   };
 
   const handleAddAddon = async () => {
-    if (!user) return;
+    if (!user || !subscription?.stripe_customer_id) return;
 
     setLoading(true);
     try {
-      // Simulate adding an addon
-      toast({
-        title: "Add-on Simulation",
-        description:
-          "In a real app, this would add 5 more endpoints to your plan",
-      });
+      // Create checkout session for endpoint addon
+      const { data: sessionData, error: sessionError } =
+        await createCheckoutSession({
+          customerId: subscription.stripe_customer_id,
+          priceId: "price_endpoint_addon", // Replace with your actual price ID
+          successUrl: `${window.location.origin}/?addon_success=true`,
+          cancelUrl: `${window.location.origin}/?addon_canceled=true`,
+        });
+
+      if (sessionError || !sessionData) {
+        throw new Error("Failed to create checkout session");
+      }
+
+      // Redirect to Stripe Checkout
+      if (sessionData.url) {
+        window.location.href = sessionData.url;
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -190,11 +225,41 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       {/* Billing History */}
       <Card>
         <CardHeader>
-          <CardTitle>Billing History</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Billing History
+            {subscription?.stripe_customer_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!subscription.stripe_customer_id) return;
+
+                  const { data, error } = await createPortalSession(
+                    subscription.stripe_customer_id,
+                    window.location.href,
+                  );
+
+                  if (data?.url) {
+                    window.location.href = data.url;
+                  } else {
+                    toast({
+                      title: "Error",
+                      description: "Failed to open billing portal",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                Manage Billing
+              </Button>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            No billing history available yet.
+            {subscription?.stripe_customer_id
+              ? "Click 'Manage Billing' to view your billing history and manage your subscription."
+              : "No billing history available yet."}
           </div>
         </CardContent>
       </Card>
