@@ -128,11 +128,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const getEndpointLimit = () => {
-    if (!subscription) return 1; // Default free tier
+    if (!subscription) return 3; // Default free tier
     if (subscription.subscription_status === "active") {
-      return 1 + subscription.endpoint_addons * 5; // 1 free + 5 per addon
+      return 3 + subscription.endpoint_addons * 5; // 3 free + 5 per addon
     }
-    return 1; // Free tier
+    return 3; // Free tier
   };
 
   const canAddEndpoint = (currentCount: number) => {
