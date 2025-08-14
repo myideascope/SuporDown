@@ -218,10 +218,30 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
                     <SelectValue placeholder="Select monitor type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="http">HTTP/HTTPS</SelectItem>
-                    <SelectItem value="tcp">TCP Port</SelectItem>
-                    <SelectItem value="ping">Ping</SelectItem>
-                    <SelectItem value="dns">DNS</SelectItem>
+                    <SelectItem value="http">
+                      🌐 HTTP/HTTPS - Web Service
+                    </SelectItem>
+                    <SelectItem value="https-ssl">
+                      🔒 HTTPS + SSL Check
+                    </SelectItem>
+                    <SelectItem value="tcp">
+                      🔌 TCP Port - Service Port
+                    </SelectItem>
+                    <SelectItem value="ping">
+                      📡 ICMP Ping - Network Reachability
+                    </SelectItem>
+                    <SelectItem value="dns">🌍 DNS Resolution</SelectItem>
+                    <SelectItem value="websocket">
+                      ⚡ WebSocket Connection
+                    </SelectItem>
+                    <SelectItem value="database">
+                      🗄️ Database Connection
+                    </SelectItem>
+                    <SelectItem value="api-health">
+                      🩺 API Health Endpoint
+                    </SelectItem>
+                    <SelectItem value="smtp">📧 SMTP Mail Server</SelectItem>
+                    <SelectItem value="ftp">📁 FTP/SFTP Server</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

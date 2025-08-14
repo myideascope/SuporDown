@@ -211,3 +211,37 @@ export const getServiceCount = async (userId: string) => {
     .eq("user_id", userId);
   return { count, error };
 };
+
+export const deleteService = async (serviceId: string, userId: string) => {
+  const { error } = await supabase
+    .from("services")
+    .delete()
+    .eq("id", serviceId)
+    .eq("user_id", userId);
+  return { error };
+};
+
+export const updateService = async (
+  serviceId: string,
+  userId: string,
+  serviceData: {
+    name?: string;
+    url?: string;
+    type?: string;
+    check_frequency?: number;
+    timeout?: number;
+    retry_count?: number;
+    success_codes?: string;
+    notify_on_failure?: boolean;
+    enabled?: boolean;
+  },
+) => {
+  const { data, error } = await supabase
+    .from("services")
+    .update(serviceData)
+    .eq("id", serviceId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+  return { data, error };
+};

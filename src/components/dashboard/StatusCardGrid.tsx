@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import ServiceDetailPanel from "./ServiceDetailPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserServices } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Service {
   id: string;
@@ -40,6 +41,7 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadServices = async () => {
@@ -79,6 +81,12 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
 
   const handleClosePanel = () => {
     setDetailPanelOpen(false);
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    setServices((prev) => prev.filter((service) => service.id !== serviceId));
+    setDetailPanelOpen(false);
+    setSelectedService(null);
   };
 
   const getStatusIcon = (status: Service["status"]) => {
@@ -199,6 +207,7 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
           service={selectedService}
           open={detailPanelOpen}
           onClose={handleClosePanel}
+          onDelete={handleDeleteService}
         />
       )}
     </div>

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { deleteService } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Card,
   CardHeader,
@@ -33,6 +35,7 @@ import {
   ExternalLink,
   LineChart,
   Settings,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -55,6 +58,7 @@ interface ServiceDetailPanelProps {
     }>;
   };
   onClose?: () => void;
+  onDelete?: (serviceId: string) => void;
 }
 
 const ServiceDetailPanel = ({
@@ -85,6 +89,7 @@ const ServiceDetailPanel = ({
     ],
   },
   onClose,
+  onDelete,
 }: ServiceDetailPanelProps) => {
   const [activeTab, setActiveTab] = useState("metrics");
   const [emailAlerts, setEmailAlerts] = useState(true);
@@ -92,7 +97,9 @@ const ServiceDetailPanel = ({
   const [slackAlerts, setSlackAlerts] = useState(true);
   const [webhookAlerts, setWebhookAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
-  const { hasPermission } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { hasPermission, user } = useAuth();
+  const { toast } = useToast();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -128,7 +135,41 @@ const ServiceDetailPanel = ({
   const copyEmbedCode = () => {
     const code = `<iframe src="https://monitor.example.com/embed/${service.id}" width="250" height="60" frameborder="0"></iframe>`;
     navigator.clipboard.writeText(code);
-    // In a real app, you would show a toast notification here
+    toast({
+      title: "Copied!",
+      description: "Embed code copied to clipboard",
+    });
+  };
+
+  const handleDeleteService = async () => {
+    if (!user || !hasPermission("edit_alerts")) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await deleteService(service.id, user.id);
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Service deleted successfully",
+        });
+        onDelete?.(service.id);
+        onClose?.();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete service",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -146,9 +187,22 @@ const ServiceDetailPanel = ({
           </div>
           <CardDescription className="mt-1">{service.url}</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasPermission("edit_alerts") && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteService}
+              disabled={isDeleting}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent>
