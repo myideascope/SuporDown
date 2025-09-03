@@ -8,6 +8,10 @@ import {
   LogOut,
   Shield,
   CreditCard,
+  Mail,
+  MessageSquare,
+  Webhook,
+  Phone,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
@@ -15,11 +19,195 @@ import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Switch } from "./ui/switch";
+import { Label } from "./ui/label";
+import { useToast } from "./ui/use-toast";
 import StatusCardGrid from "./dashboard/StatusCardGrid";
 import IncidentTimeline from "./dashboard/IncidentTimeline";
 import QuickAddWidget from "./dashboard/QuickAddWidget";
 import SubscriptionManager from "./subscription/SubscriptionManager";
 import { getServiceCount } from "@/lib/supabase";
+
+// Alert Configuration Components
+const EmailNotificationConfig = () => {
+  const [enabled, setEnabled] = useState(false);
+  const [email, setEmail] = useState("");
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    // TODO: Save to database
+    toast({
+      title: "Email Configuration Saved",
+      description: `Email notifications ${enabled ? "enabled" : "disabled"} for ${email}`,
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Mail className="h-4 w-4" />
+        <h3 className="font-medium">Email Notifications</h3>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="email-enabled">Enable email alerts</Label>
+          <Switch
+            id="email-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+        {enabled && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Button size="sm" onClick={handleSave}>
+              Save Email Settings
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SMSNotificationConfig = () => {
+  const [enabled, setEnabled] = useState(false);
+  const [phone, setPhone] = useState("");
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    // TODO: Save to database
+    toast({
+      title: "SMS Configuration Saved",
+      description: `SMS notifications ${enabled ? "enabled" : "disabled"} for ${phone}`,
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Phone className="h-4 w-4" />
+        <h3 className="font-medium">SMS Notifications</h3>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sms-enabled">Enable SMS alerts</Label>
+          <Switch
+            id="sms-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+        {enabled && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <Button size="sm" onClick={handleSave}>
+              Save SMS Settings
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SlackIntegrationConfig = () => {
+  const [enabled, setEnabled] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    // TODO: Save to database
+    toast({
+      title: "Slack Integration Saved",
+      description: `Slack notifications ${enabled ? "enabled" : "disabled"}`,
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-4 w-4" />
+        <h3 className="font-medium">Slack Integration</h3>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="slack-enabled">Enable Slack alerts</Label>
+          <Switch
+            id="slack-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+        {enabled && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter Slack webhook URL"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+            <Button size="sm" onClick={handleSave}>
+              Save Slack Settings
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const WebhookIntegrationConfig = () => {
+  const [enabled, setEnabled] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    // TODO: Save to database
+    toast({
+      title: "Webhook Integration Saved",
+      description: `Webhook notifications ${enabled ? "enabled" : "disabled"}`,
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Webhook className="h-4 w-4" />
+        <h3 className="font-medium">Webhook Integration</h3>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="webhook-enabled">Enable webhook alerts</Label>
+          <Switch
+            id="webhook-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+        {enabled && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter webhook URL"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+            <Button size="sm" onClick={handleSave}>
+              Save Webhook Settings
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const Home = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -106,11 +294,16 @@ const Home = () => {
               Monitor your services and receive alerts when they go down.
             </p>
           </div>
-          {hasPermission("edit_alerts") && (
-            <Button onClick={() => setShowQuickAdd(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Service
+          <div className="flex gap-2">
+            {hasPermission("edit_alerts") && (
+              <Button onClick={() => setShowQuickAdd(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Service
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setShowQuickAdd(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Quick Add
             </Button>
-          )}
+          </div>
         </div>
 
         <Tabs
@@ -194,58 +387,10 @@ const Home = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Email Notifications</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Send email alerts
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Configure
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">SMS Notifications</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Send SMS alerts
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Configure
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Slack Integration</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Send alerts to Slack
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Configure
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Webhook Integration</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Send alerts via webhook
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Configure
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  <EmailNotificationConfig />
+                  <SMSNotificationConfig />
+                  <SlackIntegrationConfig />
+                  <WebhookIntegrationConfig />
                 </div>
               </CardContent>
             </Card>

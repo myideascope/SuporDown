@@ -150,7 +150,7 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
     }
   };
 
-  const isFormValid = serviceConfig.name && serviceConfig.url;
+  const isFormValid = serviceConfig.name.trim() && serviceConfig.url.trim();
   const endpointLimit = getEndpointLimit();
   const canAdd = canAddEndpoint(currentServiceCount);
 
@@ -337,15 +337,7 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={
-              !isFormValid ||
-              !hasPermission("edit_alerts") ||
-              !canAdd ||
-              loading
-            }
-          >
+          <Button onClick={handleSubmit} disabled={!isFormValid || loading}>
             {loading ? "Adding..." : "Add Service"}
           </Button>
         </DialogFooter>
