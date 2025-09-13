@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle,
@@ -19,7 +20,6 @@ import {
 import { Button } from "@/components/ui/button";
 import ServiceDetailPanel from "./ServiceDetailPanel";
 import QuickAddWidget from "./QuickAddWidget";
-import { useAuth } from "@/contexts/AuthContext";
 import { getUserServices } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import SettingsPanel from "@/components/admin/SettingsPanel";
@@ -225,7 +225,9 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
       <div className="bg-white w-full p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Service Status</h2>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Service Status
+            </h2>
             <p className="text-muted-foreground">
               Monitor the health of your services and endpoints
             </p>
@@ -250,7 +252,7 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
             </Button>
           </div>
         </div>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
@@ -259,10 +261,7 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
               <p className="text-muted-foreground">
                 Add your first monitoring endpoint to get started.
               </p>
-              <Button 
-                onClick={() => setShowQuickAdd(true)}
-                className="mt-4"
-              >
+              <Button onClick={() => setShowQuickAdd(true)} className="mt-4">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Service
               </Button>

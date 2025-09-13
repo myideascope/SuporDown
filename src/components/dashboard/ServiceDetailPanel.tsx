@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/AuthContext";
 import { deleteService } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
   CardHeader,
@@ -50,7 +50,12 @@ interface ServiceDetailPanelProps {
     responseTime: number;
     lastChecked: string;
     checkFrequency: number;
-    incidentClass?: "infrastructure" | "application" | "network" | "security" | "maintenance";
+    incidentClass?:
+      | "infrastructure"
+      | "application"
+      | "network"
+      | "security"
+      | "maintenance";
     autoResendInterval?: number;
     incidents: Array<{
       id: string;
@@ -106,8 +111,12 @@ const ServiceDetailPanel = ({
   const [slackAlerts, setSlackAlerts] = useState(true);
   const [webhookAlerts, setWebhookAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
-  const [incidentClass, setIncidentClass] = useState(service.incidentClass || "infrastructure");
-  const [autoResendInterval, setAutoResendInterval] = useState(service.autoResendInterval || 15);
+  const [incidentClass, setIncidentClass] = useState(
+    service.incidentClass || "infrastructure",
+  );
+  const [autoResendInterval, setAutoResendInterval] = useState(
+    service.autoResendInterval || 15,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const { hasPermission, user } = useAuth();
   const { toast } = useToast();
@@ -187,7 +196,8 @@ const ServiceDetailPanel = ({
     // In real app, this would make an API call
     toast({
       title: "Incident Acknowledged",
-      description: "The incident has been acknowledged and notifications paused.",
+      description:
+        "The incident has been acknowledged and notifications paused.",
     });
   };
 
@@ -332,11 +342,11 @@ const ServiceDetailPanel = ({
                     >
                       <AlertCircle
                         className={`h-5 w-5 ${
-                          incident.status === "resolved" 
-                            ? "text-green-500" 
+                          incident.status === "resolved"
+                            ? "text-green-500"
                             : incident.status === "acknowledged"
-                            ? "text-blue-500"
-                            : "text-red-500"
+                              ? "text-blue-500"
+                              : "text-red-500"
                         }`}
                       />
                       <div className="flex-1">
@@ -348,8 +358,8 @@ const ServiceDetailPanel = ({
                                 incident.status === "resolved"
                                   ? "outline"
                                   : incident.status === "acknowledged"
-                                  ? "secondary"
-                                  : "destructive"
+                                    ? "secondary"
+                                    : "destructive"
                               }
                             >
                               {incident.status}
@@ -358,7 +368,9 @@ const ServiceDetailPanel = ({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleAcknowledgeIncident(incident.id)}
+                                onClick={() =>
+                                  handleAcknowledgeIncident(incident.id)
+                                }
                                 className="h-6 px-2 text-xs"
                               >
                                 <Check className="h-3 w-3 mr-1" />
@@ -376,7 +388,8 @@ const ServiceDetailPanel = ({
                         </div>
                         {incident.acknowledgedBy && (
                           <div className="text-xs text-blue-600 mt-1">
-                            Acknowledged by {incident.acknowledgedBy} at {formatDate(incident.acknowledgedAt!)}
+                            Acknowledged by {incident.acknowledgedBy} at{" "}
+                            {formatDate(incident.acknowledgedAt!)}
                           </div>
                         )}
                       </div>
@@ -473,19 +486,25 @@ const ServiceDetailPanel = ({
                   Incident Classification & Auto-Resend
                 </CardTitle>
                 <CardDescription>
-                  Configure incident classification and automatic notification resending
+                  Configure incident classification and automatic notification
+                  resending
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="incident-class">Incident Class</Label>
-                    <Select value={incidentClass} onValueChange={setIncidentClass}>
+                    <Select
+                      value={incidentClass}
+                      onValueChange={setIncidentClass}
+                    >
                       <SelectTrigger id="incident-class">
                         <SelectValue placeholder="Select incident class" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="infrastructure">Infrastructure</SelectItem>
+                        <SelectItem value="infrastructure">
+                          Infrastructure
+                        </SelectItem>
                         <SelectItem value="application">Application</SelectItem>
                         <SelectItem value="network">Network</SelectItem>
                         <SelectItem value="security">Security</SelectItem>
@@ -493,15 +512,18 @@ const ServiceDetailPanel = ({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Classifies incidents for filtering and different notification rules
+                      Classifies incidents for filtering and different
+                      notification rules
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="auto-resend">Auto-Resend Interval</Label>
-                    <Select 
-                      value={autoResendInterval.toString()} 
-                      onValueChange={(value) => setAutoResendInterval(parseInt(value))}
+                    <Select
+                      value={autoResendInterval.toString()}
+                      onValueChange={(value) =>
+                        setAutoResendInterval(parseInt(value))
+                      }
                     >
                       <SelectTrigger id="auto-resend">
                         <SelectValue placeholder="Select interval" />
@@ -517,7 +539,8 @@ const ServiceDetailPanel = ({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      How often to resend notifications until incident is acknowledged or resolved
+                      How often to resend notifications until incident is
+                      acknowledged or resolved
                     </p>
                   </div>
                 </div>

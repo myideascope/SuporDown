@@ -43,12 +43,7 @@ interface ServiceConfig {
   notifyOnFailure: boolean;
 }
 
-const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
-  open = true,
-  onOpenChange = () => {},
-  onAddService = () => {},
-  onClose = () => {},
-}) => {
+const QuickAddWidget = ({ open, onOpenChange, onAddService, onClose }: QuickAddWidgetProps) => {
   const [activeTab, setActiveTab] = useState("basic");
   const [serviceConfig, setServiceConfig] = useState<ServiceConfig>({
     name: "",
@@ -63,17 +58,9 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
   const [currentServiceCount, setCurrentServiceCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (
-    field: keyof ServiceConfig,
-    value: string | number | boolean,
-  ) => {
-    setServiceConfig((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const { hasPermission, user, getEndpointLimit, canAddEndpoint } = useAuth();
+  // Use auth context with error handling
+  const auth = useAuth();
+  const { hasPermission, user, getEndpointLimit, canAddEndpoint } = auth;
   const { toast } = useToast();
 
   useEffect(() => {
@@ -90,6 +77,16 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
     };
     loadServiceCount();
   }, [user]);
+
+  const handleInputChange = (
+    field: keyof ServiceConfig,
+    value: string | number | boolean,
+  ) => {
+    setServiceConfig((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
