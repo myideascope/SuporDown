@@ -37,6 +37,7 @@ import {
   Settings,
   Trash2,
   X,
+  Timer,
 } from "lucide-react";
 
 interface ServiceDetailPanelProps {
@@ -49,12 +50,16 @@ interface ServiceDetailPanelProps {
     responseTime: number;
     lastChecked: string;
     checkFrequency: number;
+    incidentClass?: "infrastructure" | "application" | "network" | "security" | "maintenance";
+    autoResendInterval?: number;
     incidents: Array<{
       id: string;
       date: string;
       duration: number;
-      status: "resolved" | "ongoing";
+      status: "resolved" | "ongoing" | "acknowledged";
       message: string;
+      acknowledgedBy?: string;
+      acknowledgedAt?: string;
     }>;
   };
   onClose?: () => void;
@@ -71,6 +76,8 @@ const ServiceDetailPanel = ({
     responseTime: 187,
     lastChecked: "2023-06-15T14:30:00Z",
     checkFrequency: 60,
+    incidentClass: "infrastructure",
+    autoResendInterval: 15,
     incidents: [
       {
         id: "inc-1",
@@ -83,8 +90,10 @@ const ServiceDetailPanel = ({
         id: "inc-2",
         date: "2023-06-05T22:30:00Z",
         duration: 45,
-        status: "resolved",
+        status: "acknowledged",
         message: "Service unavailable",
+        acknowledgedBy: "John Doe",
+        acknowledgedAt: "2023-06-05T22:35:00Z",
       },
     ],
   },
@@ -97,6 +106,8 @@ const ServiceDetailPanel = ({
   const [slackAlerts, setSlackAlerts] = useState(true);
   const [webhookAlerts, setWebhookAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
+  const [incidentClass, setIncidentClass] = useState(service.incidentClass || "infrastructure");
+  const [autoResendInterval, setAutoResendInterval] = useState(service.autoResendInterval || 15);
   const [isDeleting, setIsDeleting] = useState(false);
   const { hasPermission, user } = useAuth();
   const { toast } = useToast();
@@ -170,6 +181,22 @@ const ServiceDetailPanel = ({
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleAcknowledgeIncident = (incidentId: string) => {
+    // In real app, this would make an API call
+    toast({
+      title: "Incident Acknowledged",
+      description: "The incident has been acknowledged and notifications paused.",
+    });
+  };
+
+  const saveIncidentSettings = () => {
+    // In real app, this would save to database
+    toast({
+      title: "Settings Saved",
+      description: `Incident class set to ${incidentClass}, auto-resend every ${autoResendInterval} minutes.`,
+    });
   };
 
   return (
@@ -304,20 +331,41 @@ const ServiceDetailPanel = ({
                       className="flex items-start gap-4 p-3 rounded-md border"
                     >
                       <AlertCircle
-                        className={`h-5 w-5 ${incident.status === "resolved" ? "text-green-500" : "text-red-500"}`}
+                        className={`h-5 w-5 ${
+                          incident.status === "resolved" 
+                            ? "text-green-500" 
+                            : incident.status === "acknowledged"
+                            ? "text-blue-500"
+                            : "text-red-500"
+                        }`}
                       />
                       <div className="flex-1">
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-start">
                           <p className="font-medium">{incident.message}</p>
-                          <Badge
-                            variant={
-                              incident.status === "resolved"
-                                ? "outline"
-                                : "destructive"
-                            }
-                          >
-                            {incident.status}
-                          </Badge>
+                          <div className="flex gap-2">
+                            <Badge
+                              variant={
+                                incident.status === "resolved"
+                                  ? "outline"
+                                  : incident.status === "acknowledged"
+                                  ? "secondary"
+                                  : "destructive"
+                              }
+                            >
+                              {incident.status}
+                            </Badge>
+                            {incident.status === "ongoing" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAcknowledgeIncident(incident.id)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <Check className="h-3 w-3 mr-1" />
+                                Ack
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
@@ -326,6 +374,11 @@ const ServiceDetailPanel = ({
                           </div>
                           <div>Duration: {incident.duration} minutes</div>
                         </div>
+                        {incident.acknowledgedBy && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            Acknowledged by {incident.acknowledgedBy} at {formatDate(incident.acknowledgedAt!)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -411,6 +464,73 @@ const ServiceDetailPanel = ({
                   />
                 </div>
               </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-md flex items-center gap-2">
+                  <Timer className="h-4 w-4" />
+                  Incident Classification & Auto-Resend
+                </CardTitle>
+                <CardDescription>
+                  Configure incident classification and automatic notification resending
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="incident-class">Incident Class</Label>
+                    <Select value={incidentClass} onValueChange={setIncidentClass}>
+                      <SelectTrigger id="incident-class">
+                        <SelectValue placeholder="Select incident class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="infrastructure">Infrastructure</SelectItem>
+                        <SelectItem value="application">Application</SelectItem>
+                        <SelectItem value="network">Network</SelectItem>
+                        <SelectItem value="security">Security</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Classifies incidents for filtering and different notification rules
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="auto-resend">Auto-Resend Interval</Label>
+                    <Select 
+                      value={autoResendInterval.toString()} 
+                      onValueChange={(value) => setAutoResendInterval(parseInt(value))}
+                    >
+                      <SelectTrigger id="auto-resend">
+                        <SelectValue placeholder="Select interval" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Disabled</SelectItem>
+                        <SelectItem value="5">Every 5 minutes</SelectItem>
+                        <SelectItem value="15">Every 15 minutes</SelectItem>
+                        <SelectItem value="30">Every 30 minutes</SelectItem>
+                        <SelectItem value="60">Every hour</SelectItem>
+                        <SelectItem value="120">Every 2 hours</SelectItem>
+                        <SelectItem value="240">Every 4 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      How often to resend notifications until incident is acknowledged or resolved
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  onClick={saveIncidentSettings}
+                  disabled={!hasPermission("edit_alerts")}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Save Incident Settings
+                </Button>
+              </CardFooter>
             </Card>
 
             <Card>

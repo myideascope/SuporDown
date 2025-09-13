@@ -79,17 +79,43 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
   useEffect(() => {
     const loadServiceCount = async () => {
       if (user) {
-        const { count } = await getServiceCount(user.id);
-        setCurrentServiceCount(count || 0);
+        try {
+          const { count } = await getServiceCount(user.id);
+          setCurrentServiceCount(count || 0);
+        } catch (error) {
+          console.error("Failed to load service count:", error);
+          setCurrentServiceCount(0);
+        }
       }
     };
     loadServiceCount();
   }, [user]);
 
-  const handleSubmit = async () => {
-    if (!hasPermission("edit_alerts") || !user) return;
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    // Validate form
+    if (!serviceConfig.name.trim() || !serviceConfig.url.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in both Service Name and URL fields.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    if (!canAddEndpoint(currentServiceCount)) {
+    // Check permissions for authenticated users
+    if (user && !hasPermission("edit_alerts")) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to add services.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check endpoint limits for authenticated users
+    if (user && !canAddEndpoint(currentServiceCount)) {
       toast({
         title: "Endpoint Limit Reached",
         description: `You've reached your limit of ${getEndpointLimit()} endpoints. Upgrade your plan to add more.`,
@@ -100,6 +126,18 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
 
     setLoading(true);
     try {
+      // If no user (demo mode), just show success
+      if (!user) {
+        toast({
+          title: "Demo Mode - Service Added!",
+          description: `${serviceConfig.name} would be monitored every ${serviceConfig.checkFrequency} minutes in a real environment.`,
+        });
+        onAddService(serviceConfig);
+        handleClose();
+        return;
+      }
+
+      // Real user - attempt to create service
       const { data, error } = await createService({
         user_id: user.id,
         name: serviceConfig.name,
@@ -115,34 +153,23 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
       if (error) {
         toast({
           title: "Error",
-          description: error.message,
+          description: error.message || "Failed to add service",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Success",
-          description: "Service added successfully!",
+          title: "Success!",
+          description: `${serviceConfig.name} has been added and monitoring will begin shortly.`,
         });
         onAddService(serviceConfig);
-        onOpenChange(false);
-        onClose();
-        // Reset form
-        setServiceConfig({
-          name: "",
-          url: "",
-          type: "http",
-          checkFrequency: 5,
-          timeout: 30,
-          retryCount: 3,
-          successCodes: "200,201,204",
-          notifyOnFailure: true,
-        });
         setCurrentServiceCount((prev) => prev + 1);
+        handleClose();
       }
     } catch (error) {
+      console.error("Error adding service:", error);
       toast({
         title: "Error",
-        description: "Failed to add service",
+        description: "An unexpected error occurred while adding the service.",
         variant: "destructive",
       });
     } finally {
@@ -150,197 +177,228 @@ const QuickAddWidget: React.FC<QuickAddWidgetProps> = ({
     }
   };
 
+  const handleClose = () => {
+    // Reset form
+    setServiceConfig({
+      name: "",
+      url: "",
+      type: "http",
+      checkFrequency: 5,
+      timeout: 30,
+      retryCount: 3,
+      successCodes: "200,201,204",
+      notifyOnFailure: true,
+    });
+    onOpenChange(false);
+    onClose();
+  };
+
   const isFormValid = serviceConfig.name.trim() && serviceConfig.url.trim();
   const endpointLimit = getEndpointLimit();
-  const canAdd = canAddEndpoint(currentServiceCount);
+  const canAdd = user ? canAddEndpoint(currentServiceCount) : true; // Allow in demo mode
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] bg-background">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PlusIcon className="h-5 w-5" />
-            Add New Monitoring Endpoint
-          </DialogTitle>
-        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusIcon className="h-5 w-5" />
+              Add New Monitoring Endpoint
+            </DialogTitle>
+          </DialogHeader>
 
-        {!canAdd && (
-          <Alert className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              You've reached your limit of {endpointLimit} endpoints.
-              {endpointLimit === 1
-                ? " Upgrade to Pro to monitor more services."
-                : " Purchase additional endpoint add-ons to monitor more services."}
-            </AlertDescription>
-          </Alert>
-        )}
+          {user && !canAdd && (
+            <Alert className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                You've reached your limit of {endpointLimit} endpoints.
+                {endpointLimit === 1
+                  ? " Upgrade to Pro to monitor more services."
+                  : " Purchase additional endpoint add-ons to monitor more services."}
+              </AlertDescription>
+            </Alert>
+          )}
 
-        <div className="mb-4 text-sm text-muted-foreground">
-          Using {currentServiceCount} of {endpointLimit} endpoints
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="basic">Basic Settings</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="basic" className="space-y-4 mt-4">
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Service Name</Label>
-                <Input
-                  id="name"
-                  placeholder="My Website"
-                  value={serviceConfig.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="url">URL / Endpoint</Label>
-                <Input
-                  id="url"
-                  placeholder="https://example.com"
-                  value={serviceConfig.url}
-                  onChange={(e) => handleInputChange("url", e.target.value)}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="type">Monitor Type</Label>
-                <Select
-                  value={serviceConfig.type}
-                  onValueChange={(value) => handleInputChange("type", value)}
-                >
-                  <SelectTrigger id="type">
-                    <SelectValue placeholder="Select monitor type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="http">
-                      🌐 HTTP/HTTPS - Web Service
-                    </SelectItem>
-                    <SelectItem value="https-ssl">
-                      🔒 HTTPS + SSL Check
-                    </SelectItem>
-                    <SelectItem value="tcp">
-                      🔌 TCP Port - Service Port
-                    </SelectItem>
-                    <SelectItem value="ping">
-                      📡 ICMP Ping - Network Reachability
-                    </SelectItem>
-                    <SelectItem value="dns">🌍 DNS Resolution</SelectItem>
-                    <SelectItem value="websocket">
-                      ⚡ WebSocket Connection
-                    </SelectItem>
-                    <SelectItem value="database">
-                      🗄️ Database Connection
-                    </SelectItem>
-                    <SelectItem value="api-health">
-                      🩺 API Health Endpoint
-                    </SelectItem>
-                    <SelectItem value="smtp">📧 SMTP Mail Server</SelectItem>
-                    <SelectItem value="ftp">📁 FTP/SFTP Server</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="frequency">Check Frequency (minutes)</Label>
-                  <span className="text-sm">
-                    {serviceConfig.checkFrequency} min
-                  </span>
-                </div>
-                <Slider
-                  id="frequency"
-                  min={1}
-                  max={60}
-                  step={1}
-                  value={[serviceConfig.checkFrequency]}
-                  onValueChange={(value) =>
-                    handleInputChange("checkFrequency", value[0])
-                  }
-                />
-              </div>
+          {user && (
+            <div className="mb-4 text-sm text-muted-foreground">
+              Using {currentServiceCount} of {endpointLimit} endpoints
             </div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="advanced" className="space-y-4 mt-4">
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="timeout">Timeout (seconds)</Label>
-                  <span className="text-sm">{serviceConfig.timeout} sec</span>
-                </div>
-                <Slider
-                  id="timeout"
-                  min={5}
-                  max={120}
-                  step={5}
-                  value={[serviceConfig.timeout]}
-                  onValueChange={(value) =>
-                    handleInputChange("timeout", value[0])
-                  }
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="retries">Retry Count</Label>
-                  <span className="text-sm">{serviceConfig.retryCount}</span>
-                </div>
-                <Slider
-                  id="retries"
-                  min={0}
-                  max={10}
-                  step={1}
-                  value={[serviceConfig.retryCount]}
-                  onValueChange={(value) =>
-                    handleInputChange("retryCount", value[0])
-                  }
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="successCodes">Success Status Codes</Label>
-                <Input
-                  id="successCodes"
-                  placeholder="200,201,204"
-                  value={serviceConfig.successCodes}
-                  onChange={(e) =>
-                    handleInputChange("successCodes", e.target.value)
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  Comma-separated list of HTTP status codes considered
-                  successful
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="notify">Enable Notifications</Label>
-                <Switch
-                  id="notify"
-                  checked={serviceConfig.notifyOnFailure}
-                  onCheckedChange={(checked) =>
-                    handleInputChange("notifyOnFailure", checked)
-                  }
-                />
-              </div>
+          {!user && (
+            <div className="mb-4 text-sm text-blue-600 bg-blue-50 p-2 rounded">
+              Demo Mode - Service configuration will be shown but not saved
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
 
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!isFormValid || loading}>
-            {loading ? "Adding..." : "Add Service"}
-          </Button>
-        </DialogFooter>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+              <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Service Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="My Website"
+                    value={serviceConfig.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="url">URL / Endpoint *</Label>
+                  <Input
+                    id="url"
+                    placeholder="https://example.com"
+                    value={serviceConfig.url}
+                    onChange={(e) => handleInputChange("url", e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="type">Monitor Type</Label>
+                  <Select
+                    value={serviceConfig.type}
+                    onValueChange={(value) => handleInputChange("type", value)}
+                  >
+                    <SelectTrigger id="type">
+                      <SelectValue placeholder="Select monitor type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="http">
+                        🌐 HTTP/HTTPS - Web Service
+                      </SelectItem>
+                      <SelectItem value="https-ssl">
+                        🔒 HTTPS + SSL Check
+                      </SelectItem>
+                      <SelectItem value="tcp">
+                        🔌 TCP Port - Service Port
+                      </SelectItem>
+                      <SelectItem value="ping">
+                        📡 ICMP Ping - Network Reachability
+                      </SelectItem>
+                      <SelectItem value="dns">🌍 DNS Resolution</SelectItem>
+                      <SelectItem value="websocket">
+                        ⚡ WebSocket Connection
+                      </SelectItem>
+                      <SelectItem value="database">
+                        🗄️ Database Connection
+                      </SelectItem>
+                      <SelectItem value="api-health">
+                        🩺 API Health Endpoint
+                      </SelectItem>
+                      <SelectItem value="smtp">📧 SMTP Mail Server</SelectItem>
+                      <SelectItem value="ftp">📁 FTP/SFTP Server</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="frequency">Check Frequency (minutes)</Label>
+                    <span className="text-sm">
+                      {serviceConfig.checkFrequency} min
+                    </span>
+                  </div>
+                  <Slider
+                    id="frequency"
+                    min={1}
+                    max={60}
+                    step={1}
+                    value={[serviceConfig.checkFrequency]}
+                    onValueChange={(value) =>
+                      handleInputChange("checkFrequency", value[0])
+                    }
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="advanced" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="timeout">Timeout (seconds)</Label>
+                    <span className="text-sm">{serviceConfig.timeout} sec</span>
+                  </div>
+                  <Slider
+                    id="timeout"
+                    min={5}
+                    max={120}
+                    step={5}
+                    value={[serviceConfig.timeout]}
+                    onValueChange={(value) =>
+                      handleInputChange("timeout", value[0])
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="retries">Retry Count</Label>
+                    <span className="text-sm">{serviceConfig.retryCount}</span>
+                  </div>
+                  <Slider
+                    id="retries"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={[serviceConfig.retryCount]}
+                    onValueChange={(value) =>
+                      handleInputChange("retryCount", value[0])
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="successCodes">Success Status Codes</Label>
+                  <Input
+                    id="successCodes"
+                    placeholder="200,201,204"
+                    value={serviceConfig.successCodes}
+                    onChange={(e) =>
+                      handleInputChange("successCodes", e.target.value)
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated list of HTTP status codes considered
+                    successful
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="notify">Enable Notifications</Label>
+                  <Switch
+                    id="notify"
+                    checked={serviceConfig.notifyOnFailure}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("notifyOnFailure", checked)
+                    }
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              disabled={!isFormValid || loading || (user && !canAdd)}
+            >
+              {loading ? "Adding..." : "Add Service"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

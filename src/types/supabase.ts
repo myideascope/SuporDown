@@ -7,72 +7,77 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
       alert_dispatchers: {
         Row: {
-          config: Json | null
+          config: Json
           created_at: string | null
-          enabled: boolean | null
+          enabled: boolean
           id: string
           name: string
           type: string
-          updated_at: string | null
         }
         Insert: {
-          config?: Json | null
+          config: Json
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           name: string
           type: string
-          updated_at?: string | null
         }
         Update: {
-          config?: Json | null
+          config?: Json
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           name?: string
           type?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
       alerts: {
         Row: {
-          config: Json | null
           created_at: string | null
-          enabled: boolean | null
+          enabled: boolean
           id: string
-          name: string
-          service_id: string
-          updated_at: string | null
+          message: string
+          service_id: string | null
+          severity: string
+          type: string
         }
         Insert: {
-          config?: Json | null
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
-          name: string
-          service_id: string
-          updated_at?: string | null
+          message: string
+          service_id?: string | null
+          severity?: string
+          type: string
         }
         Update: {
-          config?: Json | null
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
-          name?: string
-          service_id?: string
-          updated_at?: string | null
+          message?: string
+          service_id?: string | null
+          severity?: string
+          type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alerts_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       group_permissions: {
         Row: {
@@ -116,21 +121,18 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
           id?: string
           name: string
-          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
           id?: string
           name?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -155,61 +157,91 @@ export type Database = {
         }
         Relationships: []
       }
+      service_checks: {
+        Row: {
+          checked_at: string | null
+          error_message: string | null
+          id: string
+          response_time: number | null
+          service_id: string | null
+          status: string
+          status_code: number | null
+        }
+        Insert: {
+          checked_at?: string | null
+          error_message?: string | null
+          id?: string
+          response_time?: number | null
+          service_id?: string | null
+          status: string
+          status_code?: number | null
+        }
+        Update: {
+          checked_at?: string | null
+          error_message?: string | null
+          id?: string
+          response_time?: number | null
+          service_id?: string | null
+          status?: string
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_checks_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
-          check_frequency: number | null
+          check_frequency: number
           created_at: string | null
-          enabled: boolean | null
+          enabled: boolean
           id: string
           name: string
-          notify_on_failure: boolean | null
-          retry_count: number | null
-          success_codes: string | null
-          timeout: number | null
+          notify_on_failure: boolean
+          retry_count: number
+          success_codes: string
+          timeout: number
           type: string
           updated_at: string | null
           url: string
           user_id: string | null
         }
         Insert: {
-          check_frequency?: number | null
+          check_frequency?: number
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           name: string
-          notify_on_failure?: boolean | null
-          retry_count?: number | null
-          success_codes?: string | null
-          timeout?: number | null
+          notify_on_failure?: boolean
+          retry_count?: number
+          success_codes?: string
+          timeout?: number
           type?: string
           updated_at?: string | null
           url: string
           user_id?: string | null
         }
         Update: {
-          check_frequency?: number | null
+          check_frequency?: number
           created_at?: string | null
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           name?: string
-          notify_on_failure?: boolean | null
-          retry_count?: number | null
-          success_codes?: string | null
-          timeout?: number | null
+          notify_on_failure?: boolean
+          retry_count?: number
+          success_codes?: string
+          timeout?: number
           type?: string
           updated_at?: string | null
           url?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "services_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_groups: {
         Row: {
@@ -285,7 +317,6 @@ export type Database = {
       }
       users: {
         Row: {
-          avatar_url: string | null
           created_at: string | null
           email: string
           endpoint_addons: number | null
@@ -298,7 +329,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string | null
           email: string
           endpoint_addons?: number | null
@@ -311,7 +341,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string | null
           email?: string
           endpoint_addons?: number | null

@@ -16,8 +16,11 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
-import { CalendarIcon, FilterIcon } from "lucide-react";
+import { CalendarIcon, FilterIcon, Check, Clock, AlertTriangle } from "lucide-react";
 
 interface Incident {
   id: string;
@@ -26,8 +29,14 @@ interface Incident {
   endTime: Date | null;
   duration: string;
   severity: "critical" | "major" | "minor";
-  status: "resolved" | "ongoing";
+  status: "resolved" | "ongoing" | "acknowledged";
   description: string;
+  acknowledgedBy?: string;
+  acknowledgedAt?: Date;
+  incidentClass: "infrastructure" | "application" | "network" | "security" | "maintenance";
+  autoResendInterval?: number; // minutes
+  lastNotificationSent?: Date;
+  notificationCount?: number;
 }
 
 const IncidentTimeline = ({
@@ -40,10 +49,13 @@ const IncidentTimeline = ({
   );
   const [selectedService, setSelectedService] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
+  const [selectedClass, setSelectedClass] = useState<string>("all");
   const [view, setView] = useState<"list" | "timeline">("list");
+  const [incidentList, setIncidentList] = useState<Incident[]>(incidents);
+  const { toast } = useToast();
 
   // Filter incidents based on selected filters
-  const filteredIncidents = incidents.filter((incident) => {
+  const filteredIncidents = incidentList.filter((incident) => {
     const dateMatches =
       !selectedDate ||
       incident.startTime.toDateString() === selectedDate.toDateString();
@@ -54,14 +66,84 @@ const IncidentTimeline = ({
     const severityMatches =
       selectedSeverity === "all" || incident.severity === selectedSeverity;
 
-    return dateMatches && serviceMatches && severityMatches;
+    const classMatches =
+      selectedClass === "all" || incident.incidentClass === selectedClass;
+
+    return dateMatches && serviceMatches && severityMatches && classMatches;
   });
 
   // Get unique service names for the filter dropdown
   const serviceNames = [
     "all",
-    ...new Set(incidents.map((incident) => incident.serviceName)),
+    ...new Set(incidentList.map((incident) => incident.serviceName)),
   ];
+
+  // Get unique incident classes for the filter dropdown
+  const incidentClasses = [
+    "all",
+    ...new Set(incidentList.map((incident) => incident.incidentClass)),
+  ];
+
+  const handleAcknowledgeIncident = (incidentId: string) => {
+    setIncidentList(prev => prev.map(incident => 
+      incident.id === incidentId 
+        ? {
+            ...incident,
+            status: "acknowledged" as const,
+            acknowledgedBy: "Current User", // In real app, get from auth context
+            acknowledgedAt: new Date()
+          }
+        : incident
+    ));
+    
+    toast({
+      title: "Incident Acknowledged",
+      description: "The incident has been acknowledged and notifications will be paused.",
+    });
+  };
+
+  const updateAutoResendInterval = (incidentId: string, interval: number) => {
+    setIncidentList(prev => prev.map(incident => 
+      incident.id === incidentId 
+        ? { ...incident, autoResendInterval: interval }
+        : incident
+    ));
+    
+    toast({
+      title: "Auto-resend Updated",
+      description: `Notifications will be resent every ${interval} minutes until resolved.`,
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "resolved":
+        return "text-green-600";
+      case "acknowledged":
+        return "text-blue-600";
+      case "ongoing":
+        return "text-red-600";
+      default:
+        return "text-gray-600";
+    }
+  };
+
+  const getClassColor = (incidentClass: string) => {
+    switch (incidentClass) {
+      case "infrastructure":
+        return "bg-red-100 text-red-800";
+      case "application":
+        return "bg-blue-100 text-blue-800";
+      case "network":
+        return "bg-purple-100 text-purple-800";
+      case "security":
+        return "bg-orange-100 text-orange-800";
+      case "maintenance":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
   return (
     <Card className="w-full bg-white">
@@ -131,6 +213,21 @@ const IncidentTimeline = ({
             </SelectContent>
           </Select>
 
+          {/* Class filter */}
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-[180px] h-8">
+              <SelectValue placeholder="Class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {incidentClasses.filter(c => c !== "all").map((incidentClass) => (
+                <SelectItem key={incidentClass} value={incidentClass}>
+                  {incidentClass.charAt(0).toUpperCase() + incidentClass.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="ghost"
             size="sm"
@@ -138,6 +235,7 @@ const IncidentTimeline = ({
               setSelectedDate(undefined);
               setSelectedService("all");
               setSelectedSeverity("all");
+              setSelectedClass("all");
             }}
           >
             Clear Filters
@@ -150,45 +248,101 @@ const IncidentTimeline = ({
               filteredIncidents.map((incident) => (
                 <div
                   key={incident.id}
-                  className="border rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  className="border rounded-md p-4 space-y-3"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{incident.serviceName}</h3>
-                      <Badge
-                        variant={
-                          incident.status === "resolved"
-                            ? "outline"
-                            : "destructive"
-                        }
-                        className="text-xs"
-                      >
-                        {incident.status}
-                      </Badge>
-                      <Badge
-                        variant={
-                          {
-                            critical: "destructive",
-                            major: "default",
-                            minor: "secondary",
-                          }[incident.severity]
-                        }
-                        className="text-xs"
-                      >
-                        {incident.severity}
-                      </Badge>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium">{incident.serviceName}</h3>
+                        <Badge
+                          variant={
+                            incident.status === "resolved"
+                              ? "outline"
+                              : incident.status === "acknowledged"
+                              ? "secondary"
+                              : "destructive"
+                          }
+                          className="text-xs"
+                        >
+                          {incident.status}
+                        </Badge>
+                        <Badge
+                          variant={
+                            {
+                              critical: "destructive",
+                              major: "default",
+                              minor: "secondary",
+                            }[incident.severity]
+                          }
+                          className="text-xs"
+                        >
+                          {incident.severity}
+                        </Badge>
+                        <Badge
+                          className={`text-xs ${getClassColor(incident.incidentClass)}`}
+                          variant="outline"
+                        >
+                          {incident.incidentClass}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {incident.description}
+                      </p>
+                      {incident.acknowledgedBy && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Acknowledged by {incident.acknowledgedBy} at {format(incident.acknowledgedAt!, "PPp")}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {incident.description}
-                    </p>
+                    <div className="text-sm text-right">
+                      <div>Started: {format(incident.startTime, "PPp")}</div>
+                      {incident.endTime && (
+                        <div>Ended: {format(incident.endTime, "PPp")}</div>
+                      )}
+                      <div className="font-medium">{incident.duration}</div>
+                      {incident.notificationCount && (
+                        <div className="text-xs text-muted-foreground">
+                          Notifications sent: {incident.notificationCount}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-right">
-                    <div>Started: {format(incident.startTime, "PPp")}</div>
-                    {incident.endTime && (
-                      <div>Ended: {format(incident.endTime, "PPp")}</div>
-                    )}
-                    <div className="font-medium">{incident.duration}</div>
-                  </div>
+
+                  {/* Incident Actions */}
+                  {incident.status === "ongoing" && (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcknowledgeIncident(incident.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <Check className="h-4 w-4" />
+                        Acknowledge
+                      </Button>
+                      
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`resend-${incident.id}`} className="text-sm">
+                          Auto-resend every:
+                        </Label>
+                        <Select
+                          value={incident.autoResendInterval?.toString() || "15"}
+                          onValueChange={(value) => updateAutoResendInterval(incident.id, parseInt(value))}
+                        >
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5 min</SelectItem>
+                            <SelectItem value="15">15 min</SelectItem>
+                            <SelectItem value="30">30 min</SelectItem>
+                            <SelectItem value="60">1 hour</SelectItem>
+                            <SelectItem value="120">2 hours</SelectItem>
+                            <SelectItem value="0">Disabled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -238,6 +392,12 @@ const IncidentTimeline = ({
                         >
                           {incident.severity}
                         </Badge>
+                        <Badge
+                          className={`text-xs ${getClassColor(incident.incidentClass)}`}
+                          variant="outline"
+                        >
+                          {incident.incidentClass}
+                        </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {format(incident.startTime, "PPp")}
@@ -261,7 +421,7 @@ const IncidentTimeline = ({
   );
 };
 
-// Mock data for incidents
+// Mock data for incidents with new fields
 const mockIncidents: Incident[] = [
   {
     id: "1",
@@ -272,6 +432,9 @@ const mockIncidents: Incident[] = [
     severity: "critical",
     status: "resolved",
     description: "API server was down due to database connection issues.",
+    incidentClass: "infrastructure",
+    autoResendInterval: 15,
+    notificationCount: 9,
   },
   {
     id: "2",
@@ -282,6 +445,9 @@ const mockIncidents: Incident[] = [
     severity: "minor",
     status: "resolved",
     description: "Brief outage during scheduled maintenance window.",
+    incidentClass: "maintenance",
+    autoResendInterval: 30,
+    notificationCount: 1,
   },
   {
     id: "3",
@@ -292,6 +458,10 @@ const mockIncidents: Incident[] = [
     severity: "major",
     status: "ongoing",
     description: "Users unable to log in due to OAuth provider issues.",
+    incidentClass: "application",
+    autoResendInterval: 15,
+    lastNotificationSent: new Date(2023, 5, 17, 19, 30),
+    notificationCount: 6,
   },
   {
     id: "4",
@@ -303,16 +473,24 @@ const mockIncidents: Incident[] = [
     status: "resolved",
     description:
       "Primary database node failure, automatic failover to secondary.",
+    incidentClass: "infrastructure",
+    autoResendInterval: 10,
+    notificationCount: 11,
   },
   {
     id: "5",
     serviceName: "CDN",
     startTime: new Date(2023, 5, 13, 10, 0),
-    endTime: new Date(2023, 5, 13, 10, 30),
-    duration: "30m",
+    endTime: null,
+    duration: "Ongoing",
     severity: "minor",
-    status: "resolved",
+    status: "acknowledged",
     description: "Increased latency in Asia-Pacific region.",
+    acknowledgedBy: "John Doe",
+    acknowledgedAt: new Date(2023, 5, 13, 10, 15),
+    incidentClass: "network",
+    autoResendInterval: 60,
+    notificationCount: 2,
   },
 ];
 

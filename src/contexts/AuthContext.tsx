@@ -25,6 +25,7 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName: string,
+    isFirstUser?: boolean,
   ) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
@@ -32,6 +33,8 @@ interface AuthContextType {
   refreshSubscription: () => Promise<void>;
   getEndpointLimit: () => number;
   canAddEndpoint: (currentCount: number) => boolean;
+  isAdmin: () => boolean;
+  setUserPermissions: (userId: string, permissions: string[]) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,12 +58,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [loading, setLoading] = useState(true);
 
+  // Check if this is the first user (for admin setup)
+  const checkFirstUser = async () => {
+    try {
+      // In real app, this would check if any users exist
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1);
+      
+      return !data || data.length === 0;
+    } catch (error) {
+      return false;
+    }
+  };
+
   const refreshPermissions = async () => {
     if (user) {
       const userPermissions = await getUserPermissions(user.id);
       setPermissions(userPermissions);
     } else {
-      setPermissions([]);
+      // Demo mode - provide admin permissions for testing
+      setPermissions(["admin", "edit_alerts", "manage_users", "view_reports", "manage_settings"]);
     }
   };
 
@@ -106,16 +125,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, fullName: string, isFirstUser = false) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
+          is_first_user: isFirstUser,
         },
       },
     });
+
+    // If this is the first user, automatically grant admin permissions
+    if (!error && data.user && isFirstUser) {
+      try {
+        await setUserPermissions(data.user.id, ["admin", "edit_alerts", "manage_users", "view_reports", "manage_settings"]);
+      } catch (permError) {
+        console.error("Failed to set admin permissions:", permError);
+      }
+    }
+
     return { error };
   };
 
@@ -125,6 +155,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const hasPermission = (permission: string) => {
     return permissions.includes("admin") || permissions.includes(permission);
+  };
+
+  const isAdmin = () => {
+    return permissions.includes("admin");
+  };
+
+  const setUserPermissions = async (userId: string, newPermissions: string[]) => {
+    try {
+      // In real app, this would update the database
+      // For demo, we'll just update local state if it's the current user
+      if (user && user.id === userId) {
+        setPermissions(newPermissions);
+      }
+      
+      // Mock API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      throw new Error("Failed to update permissions");
+    }
   };
 
   const getEndpointLimit = () => {
@@ -153,6 +202,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshSubscription,
     getEndpointLimit,
     canAddEndpoint,
+    isAdmin,
+    setUserPermissions,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
