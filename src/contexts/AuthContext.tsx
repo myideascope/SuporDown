@@ -75,8 +75,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const refreshPermissions = async () => {
     if (user) {
-      const userPermissions = await getUserPermissions(user.id);
-      setPermissions(userPermissions);
+      try {
+        const userPermissions = await getUserPermissions(user.id);
+        
+        // If no permissions found in database but user exists, check if they're the first user
+        if (userPermissions.length === 0) {
+          // Check if this user was created as the first user (admin)
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id')
+            .neq('id', user.id)
+            .limit(1);
+          
+          // If no other users exist, this is likely the admin user
+          if (!userData || userData.length === 0) {
+            // Grant admin permissions for the first user
+            setPermissions(["admin", "edit_alerts", "manage_users", "view_reports", "manage_settings"]);
+            return;
+          }
+        }
+        
+        setPermissions(userPermissions);
+      } catch (error) {
+        console.error('Failed to load permissions:', error);
+        // Fallback: if this is the only user, grant admin permissions
+        try {
+          const { data: allUsers } = await supabase
+            .from('users')
+            .select('id')
+            .limit(2);
+          
+          if (allUsers && allUsers.length === 1 && allUsers[0].id === user.id) {
+            setPermissions(["admin", "edit_alerts", "manage_users", "view_reports", "manage_settings"]);
+          } else {
+            setPermissions([]);
+          }
+        } catch (fallbackError) {
+          setPermissions([]);
+        }
+      }
     } else {
       // Demo mode - provide admin permissions for testing
       setPermissions(["admin", "edit_alerts", "manage_users", "view_reports", "manage_settings"]);

@@ -23,6 +23,7 @@ import QuickAddWidget from "./QuickAddWidget";
 import { getUserServices } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import SettingsPanel from "@/components/admin/SettingsPanel";
+import { useServiceMonitoring } from "@/hooks/useServiceMonitoring";
 
 interface Service {
   id: string;
@@ -84,6 +85,7 @@ const mockServices: Service[] = [
 ];
 
 const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
+  const { services: monitoredServices, loading: monitoringLoading, refresh } = useServiceMonitoring();
   const [services, setServices] = useState<Service[]>(mockServices);
   const [loading, setLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -95,37 +97,31 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
 
   useEffect(() => {
     const loadServices = async () => {
-      if (user) {
-        setLoading(true);
-        try {
-          const { data } = await getUserServices(user.id);
-          if (data && data.length > 0) {
-            // Transform database services to display format
-            const transformedServices = data.map((service) => ({
-              id: service.id,
-              name: service.name,
-              url: service.url,
-              status: "healthy" as const, // In real app, this would be calculated
-              lastChecked: "2 mins ago", // In real app, this would be calculated
-              uptime: 99.9, // In real app, this would be calculated
-              responseTime: 120, // In real app, this would be calculated
-              enabled: service.enabled ?? true,
-            }));
-            setServices(transformedServices);
-          } else {
-            // Use mock services if no real services exist
-            setServices(mockServices);
-          }
-        } catch (error) {
-          console.error("Failed to load services:", error);
-          setServices(mockServices);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        // Use mock services for demo mode
+      if (user && monitoredServices.length > 0) {
+        // Use real monitored services data
+        const transformedServices = monitoredServices.map((service) => ({
+          id: service.id,
+          name: service.name,
+          url: service.url,
+          status: service.status,
+          lastChecked: new Date(service.lastChecked).toLocaleString(),
+          uptime: service.uptime,
+          responseTime: service.responseTime,
+          enabled: service.enabled,
+        }));
+        setServices(transformedServices);
+        setLoading(false);
+      } else if (user && monitoredServices.length === 0 && !monitoringLoading) {
+        // User has no services yet
+        setServices([]);
+        setLoading(false);
+      } else if (!user) {
+        // Demo mode - use mock services
         setServices(mockServices);
         setLoading(false);
+      } else {
+        // Still loading
+        setLoading(monitoringLoading);
       }
     };
 
@@ -135,7 +131,7 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
     } else {
       loadServices();
     }
-  }, [user, propServices]);
+  }, [user, propServices, monitoredServices, monitoringLoading]);
 
   const handleCardClick = (service: Service) => {
     setSelectedService(service);
@@ -170,6 +166,11 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
     };
     setServices((prev) => [service, ...prev]);
     setShowQuickAdd(false);
+    
+    // Refresh monitoring data to pick up the new service
+    if (user) {
+      setTimeout(() => refresh(), 1000);
+    }
   };
 
   const getStatusIcon = (status: Service["status"]) => {

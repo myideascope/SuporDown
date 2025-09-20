@@ -71,40 +71,7 @@ interface ServiceDetailPanelProps {
   onDelete?: (serviceId: string) => void;
 }
 
-const ServiceDetailPanel = ({
-  service = {
-    id: "1",
-    name: "API Gateway",
-    url: "https://api.example.com/health",
-    status: "healthy",
-    uptime: 99.98,
-    responseTime: 187,
-    lastChecked: "2023-06-15T14:30:00Z",
-    checkFrequency: 60,
-    incidentClass: "infrastructure",
-    autoResendInterval: 15,
-    incidents: [
-      {
-        id: "inc-1",
-        date: "2023-06-10T08:15:00Z",
-        duration: 15,
-        status: "resolved",
-        message: "Timeout error occurred",
-      },
-      {
-        id: "inc-2",
-        date: "2023-06-05T22:30:00Z",
-        duration: 45,
-        status: "acknowledged",
-        message: "Service unavailable",
-        acknowledgedBy: "John Doe",
-        acknowledgedAt: "2023-06-05T22:35:00Z",
-      },
-    ],
-  },
-  onClose,
-  onDelete,
-}: ServiceDetailPanelProps) => {
+const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelProps) => {
   const [activeTab, setActiveTab] = useState("metrics");
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
@@ -118,7 +85,8 @@ const ServiceDetailPanel = ({
     service.autoResendInterval || 15,
   );
   const [isDeleting, setIsDeleting] = useState(false);
-  const { hasPermission, user } = useAuth();
+  const auth = useAuth();
+  const { hasPermission } = auth;
   const { toast } = useToast();
 
   const getStatusColor = (status: string) => {

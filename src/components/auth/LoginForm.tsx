@@ -83,10 +83,13 @@ const LoginForm = () => {
       // Mark that we now have users
       if (isFirstUser) {
         localStorage.setItem("hasUsers", "true");
+        setIsFirstUser(false); // Update state to enable sign-in tab
         toast({
           title: "Admin Account Created!",
           description: "Your admin account has been created successfully. You have full system access.",
         });
+        // Switch to sign-in tab after creating admin account
+        setActiveTab("signin");
       } else {
         toast({
           title: "Success",

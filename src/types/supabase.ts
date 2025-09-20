@@ -199,8 +199,11 @@ export type Database = {
         Row: {
           check_frequency: number
           created_at: string | null
+          current_status: string | null
           enabled: boolean
           id: string
+          last_checked: string | null
+          last_response_time: number | null
           name: string
           notify_on_failure: boolean
           retry_count: number
@@ -214,8 +217,11 @@ export type Database = {
         Insert: {
           check_frequency?: number
           created_at?: string | null
+          current_status?: string | null
           enabled?: boolean
           id?: string
+          last_checked?: string | null
+          last_response_time?: number | null
           name: string
           notify_on_failure?: boolean
           retry_count?: number
@@ -229,8 +235,11 @@ export type Database = {
         Update: {
           check_frequency?: number
           created_at?: string | null
+          current_status?: string | null
           enabled?: boolean
           id?: string
+          last_checked?: string | null
+          last_response_time?: number | null
           name?: string
           notify_on_failure?: boolean
           retry_count?: number
