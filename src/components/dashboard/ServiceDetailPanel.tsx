@@ -71,7 +71,32 @@ interface ServiceDetailPanelProps {
   onDelete?: (serviceId: string) => void;
 }
 
-const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelProps) => {
+const ServiceDetailPanel = ({ service, onClose, onDelete }: ServiceDetailPanelProps) => {
+  // Default service data if none provided
+  const defaultService = {
+    id: "demo-service",
+    name: "Demo Service",
+    url: "https://example.com",
+    status: "healthy" as const,
+    uptime: 99.9,
+    responseTime: 150,
+    lastChecked: new Date().toISOString(),
+    checkFrequency: 30,
+    incidentClass: "infrastructure" as const,
+    autoResendInterval: 15,
+    incidents: [
+      {
+        id: "1",
+        date: new Date(Date.now() - 86400000).toISOString(),
+        duration: 5,
+        status: "resolved" as const,
+        message: "Service temporarily unavailable",
+      },
+    ],
+  };
+
+  const serviceData = service || defaultService;
+
   const [activeTab, setActiveTab] = useState("metrics");
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
@@ -79,14 +104,15 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
   const [webhookAlerts, setWebhookAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
   const [incidentClass, setIncidentClass] = useState(
-    service.incidentClass || "infrastructure",
+    serviceData.incidentClass || "infrastructure",
   );
   const [autoResendInterval, setAutoResendInterval] = useState(
-    service.autoResendInterval || 15,
+    serviceData.autoResendInterval || 15,
   );
   const [isDeleting, setIsDeleting] = useState(false);
+  
   const auth = useAuth();
-  const { hasPermission } = auth;
+  const { user, hasPermission } = auth;
   const { toast } = useToast();
 
   const getStatusColor = (status: string) => {
@@ -121,7 +147,7 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
   };
 
   const copyEmbedCode = () => {
-    const code = `<iframe src="https://monitor.example.com/embed/${service.id}" width="250" height="60" frameborder="0"></iframe>`;
+    const code = `<iframe src="https://monitor.example.com/embed/${serviceData.id}" width="250" height="60" frameborder="0"></iframe>`;
     navigator.clipboard.writeText(code);
     toast({
       title: "Copied!",
@@ -134,7 +160,7 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
 
     setIsDeleting(true);
     try {
-      const { error } = await deleteService(service.id, user.id);
+      const { error } = await deleteService(serviceData.id, user.id);
       if (error) {
         toast({
           title: "Error",
@@ -146,7 +172,7 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
           title: "Success",
           description: "Service deleted successfully",
         });
-        onDelete?.(service.id);
+        onDelete?.(serviceData.id);
         onClose?.();
       }
     } catch (error) {
@@ -183,14 +209,14 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
         <div>
           <div className="flex items-center gap-2">
             <div
-              className={`w-3 h-3 rounded-full ${getStatusColor(service.status)}`}
+              className={`w-3 h-3 rounded-full ${getStatusColor(serviceData.status)}`}
             ></div>
-            <CardTitle>{service.name}</CardTitle>
-            <Badge variant={getStatusVariant(service.status)} className="ml-2">
-              {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
+            <CardTitle>{serviceData.name}</CardTitle>
+            <Badge variant={getStatusVariant(serviceData.status)} className="ml-2">
+              {serviceData.status.charAt(0).toUpperCase() + serviceData.status.slice(1)}
             </Badge>
           </div>
-          <CardDescription className="mt-1">{service.url}</CardDescription>
+          <CardDescription className="mt-1">{serviceData.url}</CardDescription>
         </div>
         <div className="flex items-center gap-2">
           {hasPermission("edit_alerts") && (
@@ -239,8 +265,8 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
                   <CardTitle className="text-sm font-medium">Uptime</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{service.uptime}%</div>
-                  <Progress value={service.uptime} className="mt-2" />
+                  <div className="text-2xl font-bold">{serviceData.uptime}%</div>
+                  <Progress value={serviceData.uptime} className="mt-2" />
                 </CardContent>
               </Card>
 
@@ -252,13 +278,13 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {service.responseTime} ms
+                    {serviceData.responseTime} ms
                   </div>
                   <Progress
                     value={
-                      service.responseTime < 200
+                      serviceData.responseTime < 200
                         ? 100
-                        : service.responseTime < 500
+                        : serviceData.responseTime < 500
                           ? 70
                           : 40
                     }
@@ -275,10 +301,10 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {service.checkFrequency} sec
+                    {serviceData.checkFrequency} sec
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Last checked: {formatDate(service.lastChecked)}
+                    Last checked: {formatDate(serviceData.lastChecked)}
                   </div>
                 </CardContent>
               </Card>
@@ -303,7 +329,7 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {service.incidents.map((incident) => (
+                  {serviceData.incidents.map((incident) => (
                     <div
                       key={incident.id}
                       className="flex items-start gap-4 p-3 rounded-md border"
@@ -589,15 +615,15 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
                 <div className="p-4 border rounded-md bg-muted/20 flex items-center justify-center">
                   <div className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm">
                     <div
-                      className={`w-3 h-3 rounded-full ${getStatusColor(service.status)}`}
+                      className={`w-3 h-3 rounded-full ${getStatusColor(serviceData.status)}`}
                     ></div>
-                    <span className="font-medium">{service.name}</span>
+                    <span className="font-medium">{serviceData.name}</span>
                     <Badge
-                      variant={getStatusVariant(service.status)}
+                      variant={getStatusVariant(serviceData.status)}
                       className="ml-2"
                     >
-                      {service.status.charAt(0).toUpperCase() +
-                        service.status.slice(1)}
+                      {serviceData.status.charAt(0).toUpperCase() +
+                        serviceData.status.slice(1)}
                     </Badge>
                   </div>
                 </div>
@@ -607,7 +633,7 @@ const ServiceDetailPanel = ({ service, onClose, onUpdate }: ServiceDetailPanelPr
                   <div className="relative">
                     <Input
                       readOnly
-                      value={`<iframe src="https://monitor.example.com/embed/${service.id}" width="250" height="60" frameborder="0"></iframe>`}
+                      value={`<iframe src="https://monitor.example.com/embed/${serviceData.id}" width="250" height="60" frameborder="0"></iframe>`}
                     />
                     <Button
                       variant="ghost"
