@@ -36,6 +36,28 @@ interface Service {
   enabled: boolean;
 }
 
+interface DetailedService {
+  id: string;
+  name: string;
+  url: string;
+  status: "healthy" | "degraded" | "down";
+  uptime: number;
+  responseTime: number;
+  lastChecked: string;
+  checkFrequency: number;
+  incidentClass?: "infrastructure" | "application" | "network" | "security" | "maintenance";
+  autoResendInterval?: number;
+  incidents: Array<{
+    id: string;
+    date: string;
+    duration: number;
+    status: "resolved" | "ongoing" | "acknowledged";
+    message: string;
+    acknowledgedBy?: string;
+    acknowledgedAt?: string;
+  }>;
+}
+
 interface StatusCardGridProps {
   services?: Service[];
 }
@@ -66,9 +88,9 @@ const mockServices: Service[] = [
     id: "3",
     name: "Database",
     url: "db.example.com:5432",
-    status: "degraded",
+    status: "healthy",
     lastChecked: "3 mins ago",
-    uptime: 98.5,
+    uptime: 99.5,
     responseTime: 250,
     enabled: true,
   },
@@ -76,11 +98,11 @@ const mockServices: Service[] = [
     id: "4",
     name: "CDN",
     url: "https://cdn.example.com",
-    status: "down",
+    status: "healthy",
     lastChecked: "5 mins ago",
-    uptime: 95.2,
-    responseTime: 0,
-    enabled: false,
+    uptime: 99.2,
+    responseTime: 45,
+    enabled: true,
   },
 ];
 
@@ -134,7 +156,46 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
   }, [user, propServices, monitoredServices, monitoringLoading]);
 
   const handleCardClick = (service: Service) => {
-    setSelectedService(service);
+    // Transform service data to match ServiceDetailPanel expectations
+    const detailedService: DetailedService = {
+      id: service.id,
+      name: service.name,
+      url: service.url,
+      status: service.status,
+      uptime: service.uptime,
+      responseTime: service.responseTime,
+      lastChecked: new Date().toISOString(),
+      checkFrequency: 30, // Default 30 seconds
+      incidentClass: "infrastructure",
+      autoResendInterval: 15,
+      incidents: [
+        // Generate mock incidents based on service status
+        ...(service.status === "down" ? [{
+          id: "1",
+          date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+          duration: 60,
+          status: "ongoing" as const,
+          message: `${service.name} is currently down - connection timeout`,
+        }] : []),
+        ...(service.status === "degraded" ? [{
+          id: "2", 
+          date: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+          duration: 15,
+          status: "resolved" as const,
+          message: `${service.name} experienced high response times`,
+        }] : []),
+        // Add a resolved incident for healthy services
+        {
+          id: "3",
+          date: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+          duration: 5,
+          status: "resolved" as const,
+          message: `Brief connectivity issue resolved`,
+        }
+      ],
+    };
+    
+    setSelectedService(detailedService);
     setDetailPanelOpen(true);
   };
 
@@ -381,13 +442,16 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
       )}
 
       {/* Service Detail Panel */}
-      {selectedService && (
-        <ServiceDetailPanel
-          service={selectedService}
-          open={detailPanelOpen}
-          onClose={handleClosePanel}
-          onDelete={handleDeleteService}
-        />
+      {selectedService && detailPanelOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-6xl w-full max-h-[90vh] overflow-auto">
+            <ServiceDetailPanel
+              service={selectedService}
+              onClose={handleClosePanel}
+              onDelete={handleDeleteService}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

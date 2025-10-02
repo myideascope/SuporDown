@@ -1,497 +1,404 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
-import { format } from "date-fns";
-import { CalendarIcon, FilterIcon, Check, Clock, AlertTriangle } from "lucide-react";
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  Calendar,
+  Filter,
+} from "lucide-react";
+import { useServiceMonitoring } from "@/hooks/useServiceMonitoring";
 
 interface Incident {
   id: string;
-  serviceName: string;
-  startTime: Date;
-  endTime: Date | null;
-  duration: string;
-  severity: "critical" | "major" | "minor";
-  status: "resolved" | "ongoing" | "acknowledged";
+  service: string;
+  title: string;
   description: string;
-  acknowledgedBy?: string;
-  acknowledgedAt?: Date;
-  incidentClass: "infrastructure" | "application" | "network" | "security" | "maintenance";
-  autoResendInterval?: number; // minutes
-  lastNotificationSent?: Date;
-  notificationCount?: number;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  severity: "low" | "medium" | "high" | "critical";
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  updates: Array<{
+    id: string;
+    timestamp: string;
+    message: string;
+    status: string;
+  }>;
 }
 
-const IncidentTimeline = ({
-  incidents = mockIncidents,
-}: {
-  incidents?: Incident[];
-}) => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
-  const [selectedService, setSelectedService] = useState<string>("all");
-  const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
-  const [selectedClass, setSelectedClass] = useState<string>("all");
-  const [view, setView] = useState<"list" | "timeline">("list");
-  const [incidentList, setIncidentList] = useState<Incident[]>(incidents);
-  const { toast } = useToast();
+interface ResponseTimeData {
+  timestamp: string;
+  time: string;
+  [key: string]: string | number; // For dynamic service response times
+}
 
-  // Filter incidents based on selected filters
-  const filteredIncidents = incidentList.filter((incident) => {
-    const dateMatches =
-      !selectedDate ||
-      incident.startTime.toDateString() === selectedDate.toDateString();
+const IncidentTimeline = () => {
+  const { services, loading } = useServiceMonitoring();
+  const [selectedTimeRange, setSelectedTimeRange] = useState("24h");
+  const [selectedService, setSelectedService] = useState("all");
+  const [responseTimeData, setResponseTimeData] = useState<ResponseTimeData[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
-    const serviceMatches =
-      selectedService === "all" || incident.serviceName === selectedService;
+  // Generate realistic response time data
+  useEffect(() => {
+    const generateResponseTimeData = () => {
+      const data: ResponseTimeData[] = [];
+      const now = new Date();
+      const hours = selectedTimeRange === "24h" ? 24 : selectedTimeRange === "7d" ? 168 : 720;
+      const interval = selectedTimeRange === "24h" ? 1 : selectedTimeRange === "7d" ? 6 : 24;
 
-    const severityMatches =
-      selectedSeverity === "all" || incident.severity === selectedSeverity;
+      for (let i = hours; i >= 0; i -= interval) {
+        const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000);
+        const dataPoint: ResponseTimeData = {
+          timestamp: timestamp.toISOString(),
+          time: selectedTimeRange === "24h" 
+            ? timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : timestamp.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        };
 
-    const classMatches =
-      selectedClass === "all" || incident.incidentClass === selectedClass;
+        // Add response times for each service
+        services.forEach(service => {
+          const baseTime = service.responseTime || 100;
+          const variation = Math.random() * 50 - 25; // ±25ms variation
+          const spike = Math.random() < 0.05 ? Math.random() * 200 : 0; // 5% chance of spike
+          dataPoint[service.name] = Math.max(10, baseTime + variation + spike);
+        });
 
-    return dateMatches && serviceMatches && severityMatches && classMatches;
-  });
+        data.push(dataPoint);
+      }
+      return data;
+    };
 
-  // Get unique service names for the filter dropdown
-  const serviceNames = [
-    "all",
-    ...new Set(incidentList.map((incident) => incident.serviceName)),
-  ];
+    if (services.length > 0) {
+      setResponseTimeData(generateResponseTimeData());
+    }
+  }, [services, selectedTimeRange]);
 
-  // Get unique incident classes for the filter dropdown
-  const incidentClasses = [
-    "all",
-    ...new Set(incidentList.map((incident) => incident.incidentClass)),
-  ];
+  // Generate realistic incidents based on service status
+  useEffect(() => {
+    const generateIncidents = () => {
+      const mockIncidents: Incident[] = [];
+      const now = new Date();
 
-  const handleAcknowledgeIncident = (incidentId: string) => {
-    setIncidentList(prev => prev.map(incident => 
-      incident.id === incidentId 
-        ? {
-            ...incident,
-            status: "acknowledged" as const,
-            acknowledgedBy: "Current User", // In real app, get from auth context
-            acknowledgedAt: new Date()
-          }
-        : incident
-    ));
-    
-    toast({
-      title: "Incident Acknowledged",
-      description: "The incident has been acknowledged and notifications will be paused.",
-    });
-  };
+      services.forEach((service, index) => {
+        // Add ongoing incidents for down services
+        if (service.status === 'down') {
+          mockIncidents.push({
+            id: `incident-${service.id}-current`,
+            service: service.name,
+            title: `${service.name} Service Outage`,
+            description: `${service.name} is currently experiencing connectivity issues. Our team is investigating the root cause.`,
+            status: "investigating",
+            severity: "high",
+            startTime: new Date(now.getTime() - Math.random() * 3600000).toISOString(), // Within last hour
+            updates: [
+              {
+                id: "1",
+                timestamp: new Date(now.getTime() - 1800000).toISOString(), // 30 min ago
+                message: "We are investigating reports of connectivity issues.",
+                status: "investigating"
+              },
+              {
+                id: "2", 
+                timestamp: new Date(now.getTime() - 900000).toISOString(), // 15 min ago
+                message: "Issue has been identified and our team is working on a fix.",
+                status: "identified"
+              }
+            ]
+          });
+        }
 
-  const updateAutoResendInterval = (incidentId: string, interval: number) => {
-    setIncidentList(prev => prev.map(incident => 
-      incident.id === incidentId 
-        ? { ...incident, autoResendInterval: interval }
-        : incident
-    ));
-    
-    toast({
-      title: "Auto-resend Updated",
-      description: `Notifications will be resent every ${interval} minutes until resolved.`,
-    });
-  };
+        // Add recent incidents for degraded services
+        if (service.status === 'degraded') {
+          mockIncidents.push({
+            id: `incident-${service.id}-degraded`,
+            service: service.name,
+            title: `${service.name} Performance Issues`,
+            description: `${service.name} is experiencing slower than normal response times.`,
+            status: "monitoring",
+            severity: "medium",
+            startTime: new Date(now.getTime() - Math.random() * 7200000).toISOString(), // Within last 2 hours
+            updates: [
+              {
+                id: "1",
+                timestamp: new Date(now.getTime() - 3600000).toISOString(), // 1 hour ago
+                message: "Elevated response times detected. Investigating cause.",
+                status: "investigating"
+              },
+              {
+                id: "2",
+                timestamp: new Date(now.getTime() - 1800000).toISOString(), // 30 min ago
+                message: "Performance improvements implemented. Monitoring closely.",
+                status: "monitoring"
+              }
+            ]
+          });
+        }
 
-  const getStatusColor = (status: string) => {
+        // Add resolved incidents for all services (historical data)
+        const resolvedIncidentCount = Math.floor(Math.random() * 3) + 1;
+        for (let i = 0; i < resolvedIncidentCount; i++) {
+          const startTime = new Date(now.getTime() - Math.random() * 30 * 24 * 3600000); // Within last 30 days
+          const duration = Math.random() * 120 + 5; // 5-125 minutes
+          const endTime = new Date(startTime.getTime() + duration * 60000);
+
+          mockIncidents.push({
+            id: `incident-${service.id}-resolved-${i}`,
+            service: service.name,
+            title: `${service.name} ${Math.random() < 0.5 ? 'Connectivity' : 'Performance'} Issue`,
+            description: `Brief ${Math.random() < 0.5 ? 'outage' : 'performance degradation'} affecting ${service.name}.`,
+            status: "resolved",
+            severity: Math.random() < 0.3 ? "high" : Math.random() < 0.6 ? "medium" : "low",
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            duration: Math.round(duration),
+            updates: [
+              {
+                id: "1",
+                timestamp: startTime.toISOString(),
+                message: "Issue detected and investigation started.",
+                status: "investigating"
+              },
+              {
+                id: "2",
+                timestamp: new Date(startTime.getTime() + duration * 60000 * 0.8).toISOString(),
+                message: "Root cause identified and fix implemented.",
+                status: "identified"
+              },
+              {
+                id: "3",
+                timestamp: endTime.toISOString(),
+                message: "Service fully restored. Monitoring for stability.",
+                status: "resolved"
+              }
+            ]
+          });
+        }
+      });
+
+      // Sort by start time (newest first)
+      return mockIncidents.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    };
+
+    if (services.length > 0) {
+      setIncidents(generateIncidents());
+    }
+  }, [services]);
+
+  const getStatusIcon = (status: Incident["status"]) => {
     switch (status) {
+      case "investigating":
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case "identified":
+        return <Clock className="h-4 w-4 text-blue-500" />;
+      case "monitoring":
+        return <TrendingUp className="h-4 w-4 text-yellow-500" />;
       case "resolved":
-        return "text-green-600";
-      case "acknowledged":
-        return "text-blue-600";
-      case "ongoing":
-        return "text-red-600";
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
       default:
-        return "text-gray-600";
+        return <XCircle className="h-4 w-4 text-red-500" />;
     }
   };
 
-  const getClassColor = (incidentClass: string) => {
-    switch (incidentClass) {
-      case "infrastructure":
-        return "bg-red-100 text-red-800";
-      case "application":
-        return "bg-blue-100 text-blue-800";
-      case "network":
-        return "bg-purple-100 text-purple-800";
-      case "security":
-        return "bg-orange-100 text-orange-800";
-      case "maintenance":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const getSeverityBadge = (severity: Incident["severity"]) => {
+    const variants = {
+      low: "bg-blue-100 text-blue-800",
+      medium: "bg-yellow-100 text-yellow-800", 
+      high: "bg-orange-100 text-orange-800",
+      critical: "bg-red-100 text-red-800",
+    };
+
+    return (
+      <Badge className={variants[severity]}>
+        {severity.charAt(0).toUpperCase() + severity.slice(1)}
+      </Badge>
+    );
   };
+
+  const filteredIncidents = incidents.filter(incident => 
+    selectedService === "all" || incident.service === selectedService
+  );
+
+  const serviceColors = [
+    "#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00ff00", "#ff00ff"
+  ];
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Incident Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-32 bg-muted rounded"></div>
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-16 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="w-full bg-white">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Incident Timeline</CardTitle>
-        <div className="flex items-center space-x-2">
-          <Tabs
-            value={view}
-            onValueChange={(value) => setView(value as "list" | "timeline")}
-          >
-            <TabsList>
-              <TabsTrigger value="list">List View</TabsTrigger>
-              <TabsTrigger value="timeline">Timeline View</TabsTrigger>
-            </TabsList>
-          </Tabs>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Incident Timeline & Performance
+          </CardTitle>
+          <div className="flex gap-2">
+            <select
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              className="px-3 py-1 border rounded-md text-sm"
+            >
+              <option value="all">All Services</option>
+              {services.map(service => (
+                <option key={service.id} value={service.name}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedTimeRange}
+              onChange={(e) => setSelectedTimeRange(e.target.value)}
+              className="px-3 py-1 border rounded-md text-sm"
+            >
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex flex-wrap gap-2 items-center">
-          <div className="flex items-center">
-            <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filters:</span>
-          </div>
-
-          {/* Date filter */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-
-          {/* Service filter */}
-          <Select value={selectedService} onValueChange={setSelectedService}>
-            <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Service" />
-            </SelectTrigger>
-            <SelectContent>
-              {serviceNames.map((service) => (
-                <SelectItem key={service} value={service}>
-                  {service === "all" ? "All Services" : service}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Severity filter */}
-          <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-            <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Severity" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Severities</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="major">Major</SelectItem>
-              <SelectItem value="minor">Minor</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Class filter */}
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {incidentClasses.filter(c => c !== "all").map((incidentClass) => (
-                <SelectItem key={incidentClass} value={incidentClass}>
-                  {incidentClass.charAt(0).toUpperCase() + incidentClass.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedDate(undefined);
-              setSelectedService("all");
-              setSelectedSeverity("all");
-              setSelectedClass("all");
-            }}
-          >
-            Clear Filters
-          </Button>
-        </div>
-
-        {view === "list" ? (
-          <div className="space-y-4">
-            {filteredIncidents.length > 0 ? (
-              filteredIncidents.map((incident) => (
-                <div
-                  key={incident.id}
-                  className="border rounded-md p-4 space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-medium">{incident.serviceName}</h3>
-                        <Badge
-                          variant={
-                            incident.status === "resolved"
-                              ? "outline"
-                              : incident.status === "acknowledged"
-                              ? "secondary"
-                              : "destructive"
-                          }
-                          className="text-xs"
-                        >
-                          {incident.status}
-                        </Badge>
-                        <Badge
-                          variant={
-                            {
-                              critical: "destructive",
-                              major: "default",
-                              minor: "secondary",
-                            }[incident.severity]
-                          }
-                          className="text-xs"
-                        >
-                          {incident.severity}
-                        </Badge>
-                        <Badge
-                          className={`text-xs ${getClassColor(incident.incidentClass)}`}
-                          variant="outline"
-                        >
-                          {incident.incidentClass}
-                        </Badge>
+        <Tabs defaultValue="timeline" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="timeline">Incident Timeline</TabsTrigger>
+            <TabsTrigger value="performance">Response Time History</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="timeline" className="space-y-4">
+            {filteredIncidents.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Recent Incidents</h3>
+                <p className="text-muted-foreground">
+                  All services are running smoothly with no reported incidents.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredIncidents.map((incident) => (
+                  <Card key={incident.id} className="border-l-4 border-l-blue-500">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {getStatusIcon(incident.status)}
+                            <h4 className="font-semibold">{incident.title}</h4>
+                            {getSeverityBadge(incident.severity)}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {incident.description}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>Service: {incident.service}</span>
+                            <span>Started: {new Date(incident.startTime).toLocaleString()}</span>
+                            {incident.endTime && (
+                              <span>Duration: {incident.duration} minutes</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {incident.description}
-                      </p>
-                      {incident.acknowledgedBy && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Acknowledged by {incident.acknowledgedBy} at {format(incident.acknowledgedAt!, "PPp")}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-sm text-right">
-                      <div>Started: {format(incident.startTime, "PPp")}</div>
-                      {incident.endTime && (
-                        <div>Ended: {format(incident.endTime, "PPp")}</div>
-                      )}
-                      <div className="font-medium">{incident.duration}</div>
-                      {incident.notificationCount && (
-                        <div className="text-xs text-muted-foreground">
-                          Notifications sent: {incident.notificationCount}
+                      
+                      {incident.updates.length > 0 && (
+                        <div className="mt-4 pl-4 border-l-2 border-muted">
+                          <h5 className="text-sm font-medium mb-2">Updates:</h5>
+                          <div className="space-y-2">
+                            {incident.updates.slice(-2).map((update) => (
+                              <div key={update.id} className="text-xs">
+                                <span className="text-muted-foreground">
+                                  {new Date(update.timestamp).toLocaleString()}
+                                </span>
+                                <p className="mt-1">{update.message}</p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Incident Actions */}
-                  {incident.status === "ongoing" && (
-                    <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t">
-                      <Button
-                        size="sm"
-                        onClick={() => handleAcknowledgeIncident(incident.id)}
-                        className="flex items-center gap-2"
-                      >
-                        <Check className="h-4 w-4" />
-                        Acknowledge
-                      </Button>
-                      
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`resend-${incident.id}`} className="text-sm">
-                          Auto-resend every:
-                        </Label>
-                        <Select
-                          value={incident.autoResendInterval?.toString() || "15"}
-                          onValueChange={(value) => updateAutoResendInterval(incident.id, parseInt(value))}
-                        >
-                          <SelectTrigger className="w-24 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="5">5 min</SelectItem>
-                            <SelectItem value="15">15 min</SelectItem>
-                            <SelectItem value="30">30 min</SelectItem>
-                            <SelectItem value="60">1 hour</SelectItem>
-                            <SelectItem value="120">2 hours</SelectItem>
-                            <SelectItem value="0">Disabled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No incidents found matching the selected filters.
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
-          </div>
-        ) : (
-          <div className="relative mt-6 h-[200px]">
-            {/* Timeline visualization */}
-            <div className="absolute left-0 top-0 h-full w-1 bg-border"></div>
-
-            {filteredIncidents.length > 0 ? (
-              filteredIncidents.map((incident, index) => {
-                // Calculate position based on index
-                const topPosition = `${index * 40}px`;
-                const dotColor = {
-                  critical: "bg-destructive",
-                  major: "bg-amber-500",
-                  minor: "bg-blue-500",
-                }[incident.severity];
-
-                return (
-                  <div
-                    key={incident.id}
-                    className="absolute left-0 ml-6"
-                    style={{ top: topPosition }}
-                  >
-                    <div
-                      className={`absolute -left-[10px] -top-[4px] w-3 h-3 rounded-full ${dotColor}`}
-                    ></div>
-                    <div className="ml-4 p-2 border rounded-md bg-card shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                          {incident.serviceName}
-                        </span>
-                        <Badge
-                          variant={
-                            {
-                              critical: "destructive",
-                              major: "default",
-                              minor: "secondary",
-                            }[incident.severity]
-                          }
-                          className="text-xs"
-                        >
-                          {incident.severity}
-                        </Badge>
-                        <Badge
-                          className={`text-xs ${getClassColor(incident.incidentClass)}`}
-                          variant="outline"
-                        >
-                          {incident.incidentClass}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(incident.startTime, "PPp")}
-                        {incident.status === "resolved"
-                          ? ` - ${incident.duration}`
-                          : " - Ongoing"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+          </TabsContent>
+          
+          <TabsContent value="performance" className="space-y-4">
+            {responseTimeData.length === 0 ? (
+              <div className="text-center py-8">
+                <TrendingUp className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Performance Data</h3>
+                <p className="text-muted-foreground">
+                  Response time data will appear here once services are monitored.
+                </p>
+              </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground ml-6">
-                No incidents found matching the selected filters.
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={responseTimeData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis label={{ value: 'Response Time (ms)', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip 
+                      labelFormatter={(label) => `Time: ${label}`}
+                      formatter={(value: number, name: string) => [`${Math.round(value)}ms`, name]}
+                    />
+                    {services.map((service, index) => (
+                      <Line
+                        key={service.id}
+                        type="monotone"
+                        dataKey={service.name}
+                        stroke={serviceColors[index % serviceColors.length]}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
 };
-
-// Mock data for incidents with new fields
-const mockIncidents: Incident[] = [
-  {
-    id: "1",
-    serviceName: "API Server",
-    startTime: new Date(2023, 5, 15, 14, 30),
-    endTime: new Date(2023, 5, 15, 16, 45),
-    duration: "2h 15m",
-    severity: "critical",
-    status: "resolved",
-    description: "API server was down due to database connection issues.",
-    incidentClass: "infrastructure",
-    autoResendInterval: 15,
-    notificationCount: 9,
-  },
-  {
-    id: "2",
-    serviceName: "Web Dashboard",
-    startTime: new Date(2023, 5, 16, 9, 15),
-    endTime: new Date(2023, 5, 16, 9, 45),
-    duration: "30m",
-    severity: "minor",
-    status: "resolved",
-    description: "Brief outage during scheduled maintenance window.",
-    incidentClass: "maintenance",
-    autoResendInterval: 30,
-    notificationCount: 1,
-  },
-  {
-    id: "3",
-    serviceName: "Authentication Service",
-    startTime: new Date(2023, 5, 17, 18, 0),
-    endTime: null,
-    duration: "Ongoing",
-    severity: "major",
-    status: "ongoing",
-    description: "Users unable to log in due to OAuth provider issues.",
-    incidentClass: "application",
-    autoResendInterval: 15,
-    lastNotificationSent: new Date(2023, 5, 17, 19, 30),
-    notificationCount: 6,
-  },
-  {
-    id: "4",
-    serviceName: "Database Cluster",
-    startTime: new Date(2023, 5, 14, 2, 30),
-    endTime: new Date(2023, 5, 14, 4, 15),
-    duration: "1h 45m",
-    severity: "critical",
-    status: "resolved",
-    description:
-      "Primary database node failure, automatic failover to secondary.",
-    incidentClass: "infrastructure",
-    autoResendInterval: 10,
-    notificationCount: 11,
-  },
-  {
-    id: "5",
-    serviceName: "CDN",
-    startTime: new Date(2023, 5, 13, 10, 0),
-    endTime: null,
-    duration: "Ongoing",
-    severity: "minor",
-    status: "acknowledged",
-    description: "Increased latency in Asia-Pacific region.",
-    acknowledgedBy: "John Doe",
-    acknowledgedAt: new Date(2023, 5, 13, 10, 15),
-    incidentClass: "network",
-    autoResendInterval: 60,
-    notificationCount: 2,
-  },
-];
 
 export default IncidentTimeline;
