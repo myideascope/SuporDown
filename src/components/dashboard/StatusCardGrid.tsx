@@ -24,6 +24,7 @@ import { getUserServices } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import SettingsPanel from "@/components/admin/SettingsPanel";
 import { useServiceMonitoring } from "@/hooks/useServiceMonitoring";
+import { supabase } from "@/lib/supabase";
 
 interface Service {
   id: string;
@@ -62,14 +63,14 @@ interface StatusCardGridProps {
   services?: Service[];
 }
 
-// Mock services for demo/fallback
+// Mock services for demo/fallback with more realistic data
 const mockServices: Service[] = [
   {
     id: "1",
     name: "Main Website",
     url: "https://example.com",
     status: "healthy",
-    lastChecked: "2 mins ago",
+    lastChecked: new Date(Date.now() - 2 * 60 * 1000).toLocaleString(), // 2 mins ago
     uptime: 99.9,
     responseTime: 120,
     enabled: true,
@@ -79,7 +80,7 @@ const mockServices: Service[] = [
     name: "API Server",
     url: "https://api.example.com",
     status: "healthy",
-    lastChecked: "1 min ago",
+    lastChecked: new Date(Date.now() - 1 * 60 * 1000).toLocaleString(), // 1 min ago
     uptime: 99.8,
     responseTime: 85,
     enabled: true,
@@ -88,10 +89,10 @@ const mockServices: Service[] = [
     id: "3",
     name: "Database",
     url: "db.example.com:5432",
-    status: "healthy",
-    lastChecked: "3 mins ago",
-    uptime: 99.5,
-    responseTime: 250,
+    status: "degraded",
+    lastChecked: new Date(Date.now() - 3 * 60 * 1000).toLocaleString(), // 3 mins ago
+    uptime: 98.5,
+    responseTime: 450,
     enabled: true,
   },
   {
@@ -99,7 +100,7 @@ const mockServices: Service[] = [
     name: "CDN",
     url: "https://cdn.example.com",
     status: "healthy",
-    lastChecked: "5 mins ago",
+    lastChecked: new Date(Date.now() - 5 * 60 * 1000).toLocaleString(), // 5 mins ago
     uptime: 99.2,
     responseTime: 45,
     enabled: true,
@@ -108,8 +109,8 @@ const mockServices: Service[] = [
 
 const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
   const { services: monitoredServices, loading: monitoringLoading, refresh } = useServiceMonitoring();
-  const [services, setServices] = useState<Service[]>(mockServices);
-  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -117,42 +118,61 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
   const { user, hasPermission } = useAuth();
   const { toast } = useToast();
 
+  // Auto-refresh services every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user && !loading) {
+        refresh();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user, loading, refresh]);
+
   useEffect(() => {
     const loadServices = async () => {
-      if (user && monitoredServices.length > 0) {
-        // Use real monitored services data
-        const transformedServices = monitoredServices.map((service) => ({
-          id: service.id,
-          name: service.name,
-          url: service.url,
-          status: service.status,
-          lastChecked: new Date(service.lastChecked).toLocaleString(),
-          uptime: service.uptime,
-          responseTime: service.responseTime,
-          enabled: service.enabled,
-        }));
-        setServices(transformedServices);
+      setLoading(true);
+      
+      if (propServices) {
+        // Use provided services (for storybook/demo)
+        setServices(propServices);
         setLoading(false);
-      } else if (user && monitoredServices.length === 0 && !monitoringLoading) {
-        // User has no services yet
-        setServices([]);
-        setLoading(false);
-      } else if (!user) {
-        // Demo mode - use mock services
-        setServices(mockServices);
-        setLoading(false);
-      } else {
-        // Still loading
-        setLoading(monitoringLoading);
+        return;
       }
+
+      if (user) {
+        if (monitoredServices.length > 0) {
+          // Use real monitored services data with proper transformation
+          const transformedServices = monitoredServices.map((service) => ({
+            id: service.id,
+            name: service.name,
+            url: service.url,
+            status: service.status,
+            lastChecked: service.lastChecked,
+            uptime: Math.round(service.uptime * 100) / 100, // Round to 2 decimal places
+            responseTime: Math.round(service.responseTime),
+            enabled: service.enabled,
+          }));
+          setServices(transformedServices);
+        } else if (!monitoringLoading) {
+          // User has no services yet, show empty state
+          setServices([]);
+        }
+      } else {
+        // Demo mode - use mock services with dynamic updates
+        const updatedMockServices = mockServices.map(service => ({
+          ...service,
+          lastChecked: new Date(Date.now() - Math.random() * 5 * 60 * 1000).toLocaleString(),
+          responseTime: Math.round(service.responseTime + (Math.random() - 0.5) * 20),
+          uptime: Math.round((service.uptime + (Math.random() - 0.5) * 0.2) * 100) / 100,
+        }));
+        setServices(updatedMockServices);
+      }
+      
+      setLoading(false);
     };
 
-    if (propServices) {
-      setServices(propServices);
-      setLoading(false);
-    } else {
-      loadServices();
-    }
+    loadServices();
   }, [user, propServices, monitoredServices, monitoringLoading]);
 
   const handleCardClick = (service: Service) => {
@@ -204,34 +224,103 @@ const StatusCardGrid = ({ services: propServices }: StatusCardGridProps) => {
     setSelectedService(null);
   };
 
-  const handleDeleteService = (serviceId: string) => {
-    setServices((prev) => prev.filter((service) => service.id !== serviceId));
+  const handleDeleteService = async (serviceId: string) => {
+    if (user) {
+      // Delete from database
+      try {
+        const { error } = await supabase
+          .from('services')
+          .delete()
+          .eq('id', serviceId)
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+        
+        // Refresh services after deletion
+        await refresh();
+        
+        toast({
+          title: "Service Deleted",
+          description: "The service has been removed from monitoring.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete service. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Demo mode - just remove from local state
+      setServices((prev) => prev.filter((service) => service.id !== serviceId));
+      toast({
+        title: "Service Deleted",
+        description: "The service has been removed from monitoring.",
+      });
+    }
+    
     setDetailPanelOpen(false);
     setSelectedService(null);
-    toast({
-      title: "Service Deleted",
-      description: "The service has been removed from monitoring.",
-    });
   };
 
-  const handleAddService = (newService: any) => {
-    const service: Service = {
-      id: Date.now().toString(),
-      name: newService.name,
-      url: newService.url,
-      status: "healthy",
-      lastChecked: "Just now",
-      uptime: 100,
-      responseTime: 0,
-      enabled: true,
-    };
-    setServices((prev) => [service, ...prev]);
-    setShowQuickAdd(false);
-    
-    // Refresh monitoring data to pick up the new service
+  const handleAddService = async (newService: any) => {
     if (user) {
-      setTimeout(() => refresh(), 1000);
+      // Add to database
+      try {
+        const { data, error } = await supabase
+          .from('services')
+          .insert({
+            user_id: user.id,
+            name: newService.name,
+            url: newService.url,
+            type: newService.type || 'http',
+            check_frequency: newService.checkFrequency || 60,
+            timeout: 30,
+            retry_count: 3,
+            success_codes: '200,201,202,204',
+            notify_on_failure: true,
+            enabled: true,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Refresh services after addition
+        await refresh();
+        
+        toast({
+          title: "Service Added",
+          description: `${newService.name} has been added to monitoring.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error", 
+          description: "Failed to add service. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Demo mode - add to local state
+      const service: Service = {
+        id: Date.now().toString(),
+        name: newService.name,
+        url: newService.url,
+        status: "healthy",
+        lastChecked: new Date().toLocaleString(),
+        uptime: 100,
+        responseTime: Math.floor(Math.random() * 100 + 50),
+        enabled: true,
+      };
+      setServices((prev) => [service, ...prev]);
+      
+      toast({
+        title: "Service Added",
+        description: `${newService.name} has been added to monitoring.`,
+      });
     }
+    
+    setShowQuickAdd(false);
   };
 
   const getStatusIcon = (status: Service["status"]) => {
